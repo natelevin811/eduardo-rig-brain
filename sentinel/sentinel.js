@@ -20,6 +20,18 @@ autowatch = 1;
 inlets = 1;
 outlets = 3;
 
+// BUILD stamp: posts on every compile (load AND autowatch recompile) so the
+// Max window always shows which file revision is actually running.
+var BUILD = '2026-06-12c trust-gate';
+(function () {
+  var loc = '';
+  try {
+    var f = new File(jsarguments[0]); // resolves via the search path — shows WHICH copy
+    if (f.isopen) { loc = ' @ ' + f.foldername; f.close(); }
+  } catch (e) {}
+  post('[sentinel] build ' + BUILD + loc + '\n');
+})();
+
 include("resolver.js");
 include("telemetry.js");
 
