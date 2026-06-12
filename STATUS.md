@@ -69,14 +69,87 @@ are now parked and applied after resolve).
   - raw `api.set(`/`api.call(`: only inside `Resolver.set`/`Resolver.call`
     themselves. No bypass exists.
 
+## Set prep — AUTOMATED (2026-06-12)
+
+`tools/prep-set.py` performed the SHELL-BUILD §3 Live-set prep on a copy:
+**`6.7.3_eduardo_2026_STAGE_v6.als`** (iCloud, next to v5; v5 untouched =
+kill-order layer intact). SENTRIM Utility ×6 appended at end of each bus chain
+(0 dB, fully neutral) + CONDUCTOR MIDI track (no output, collapsed, last
+position) with all 19 named command clips in the first 19 scenes.
+
+Verified by `tools/verify-set.py` (pointee-id uniqueness incl. the
+ControllerTargets.N space, PointeeId reference resolution, baseline diff
+accounting) AND by an independent adversarial review agent, whose first pass
+caught a real BLOCKER (139 duplicated pointee ids on cloned
+ControllerTargets/FreezeSequencer targets — six ShephardsTone clip envelopes
+were at rebind risk). Fixed, regenerated, re-reviewed: reviewer removed the
+additions from v6 and got a **byte-identical** match to v5. Verdict: SHIP.
+
+Key representation fact discovered: **Utility Gain `Manual` is stored LINEAR in
+.als XML** (10^(dB/20); 0 dB == 1.0) even though UI/LOM are dB-native. A naive
+"0" would have muted all six buses.
+
+Both finished devices also copied to iCloud next to the sets:
+`CONDUCTOR.amxd`, `SENTINEL.amxd`.
+
 ## Needs human hands (in order)
 
-1. **Shell build** (~15 min, docs/SHELL-BUILD.md) + Live-set prep (SENTRIM ×6,
-   CONDUCTOR track + 19 named clips, save as v5).
+1. **Open v6 in Live** (first open of a script-modified set: eyeball tracks,
+   audio passes, SENTRIM ×6 visible at chain ends, CONDUCTOR track + 19 clips).
+   Note: set was last saved by Live 12.4.1; this machine has 12.3.2 — any
+   newer-version warning predates our edits (v5 shows it too).
+2. **Max search path** (SHELL-BUILD §0, one time), then drag `CONDUCTOR.amxd`
+   onto 40 Master FX and `SENTINEL.amxd` onto Master. Expect "all setmap names
+   resolved clean" ×2 — the two previously-missing name groups now exist.
+   Confirm `live.*` face controls + pattr param-mode in the inspector (taste).
 2. **Calibration pass** (docs/CALIBRATION.md C0–C10) — C0 (plugsync~ scaling),
    C1 (DJ polarity), C2 (Fade direction), C8 (meter scale + SENTRIM dB) are
    load-bearing; the rest are taste.
 3. **Soak** (test/soak-checklist.md). Living-room law: doesn't pass → v4 plays.
+
+## Shell-generator review pass (2026-06-12, second-model review)
+
+Narrow review of `tools/build-shells.mjs` output against Max 9.0.9 refpages +
+Ableton's shipped M4L patches found and fixed **4 real wiring bugs** in the
+first-cut generated shells:
+
+1. **live.remote~ id cords → wrong inlet.** `id` binds via the RIGHT inlet
+   (inlet 1; confirmed in M4L.SignalToLiveParam). All 48/14 id + freebang-release
+   cords went into inlet 0 → no grab would ever have bound.
+2. **pattr bound via outlet 0.** Binding is the MIDDLE outlet (1, "bindto
+   connection") → state persistence would silently not bind.
+3. **live.text mode inverted.** Refpage: 0=Button, 1=Toggle. ABORT/RITUAL were
+   toggles (latching abort!), ALIVE/DRY-RUN/NIGHT ARC were buttons.
+4. **Buttons routed through [sel 1].** Button mode emits a *bang* — sel 1 never
+   matches → ABORT/RITUAL would never have fired. Now wired direct to messages.
+
+All four are the kind of thing the smoke test would have caught at the gig-prep
+table, but now they're caught at build time: `tools/verify-shells.py` is a
+permanent static gate (id collisions, real inlet/outlet ranges, the four
+semantics above, clock-outlet-6, slot counts). Both devices verify CLEAN.
+Remaining true unknowns are runtime-only: does Live accept the injected
+template clone, and C0 clock-speed sanity. **Max-editor eyeball still required.**
+
+## Name-resolution pre-flight (static, against v5 set, 2026-06-12)
+
+Parsed `6.7.3_eduardo_2026_STAGE_v5.als` (104 MB XML) and matched every
+resolve-by-name target. **Resolves clean (exact names present):** LoDrums/HiDrums/
+Perc/Bass/Pads/LeadsBus; `DJ Filter Soft Clip` on all six (LeadsBus's is inside
+its rack — resolver's recursive case, confirmed); `40 Master FX` / `Nate & Will
+Master FX`; CL#1-6; `WhiteNoise`/`KnobRiser`; `42-ShephardsTone`; all six returns
+A–F; `HELIX CAPTURE IN` with `TRIM`+`FADE`; `6 Melodies` EQ Three; REC FEED + Cptr.
+
+**Still absent in the set (the two manual-prep ADDs — expected):**
+1. `SENTRIM` Utility on the six buses — **0 found**. SENTINEL will red-text all
+   six until added.
+2. `CONDUCTOR` MIDI track + named command clips — **0 found** (`WASH 16`, `TIDE
+   OUT`, `CLEAN SLATE`, etc. all absent). CONDUCTOR has no track to observe until
+   created.
+
+So "all setmap names resolved clean" in the smoke test will NOT pass until those
+two ADDs are done — by design, and they'll surface as red text, not silent fail.
+Minor: setmap said WhiteNoise has 16 noise clips; set has 8 (`30-P-LASK Noise
+Generator 1`). RISE fires *any* clip, so non-blocking.
 
 ## Open questions (setmap ambiguities)
 
@@ -102,8 +175,11 @@ are now parked and applied after resolve).
 
 ### Still open
 
-- **Q5: plugsync~ outlet scaling** — beats vs ticks differs by Max version;
-  needs the device running in Max (C0). Worst case: one `[/ 480.]` per shell.
+- **Q5: plugsync~ outlet scaling** — ✅ RESOLVED against the Max 9.0.9 bundle
+  (the M4L runtime inside Live 12; the standalone Max 7.3.6 in /Applications is
+  unused). `plugsync~` has no signal outlet; **outlet 6 = raw ticks** (cumulative,
+  tempo-independent), beats = ticks / **480**. The generator wires exactly this.
+  C0 is now just a confirm-the-speed sanity check, not an open question.
 - **Q6: BLOOM/SUNRISE send return-shape** — current build returns sends to
   captured over the last quarter of the move (nothing ends displaced except
   NIGHTFALL/DISSOLVE holds). **Resolve in the room** by ear.

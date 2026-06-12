@@ -1,4 +1,48 @@
-# SHELL-BUILD.md — building the two .amxd shells (~15 min in the Max editor)
+# SHELL-BUILD.md — building the two .amxd shells
+
+## Fastest path: generate them (recommended)
+
+`tools/build-shells.mjs` writes both finished devices by cloning Ableton's own
+empty **Max Audio Effect.amxd** and injecting every object + patch cord this doc
+describes — including the tedious 24× / 7× `live.remote~` grab pools. No hand-wiring.
+
+```
+node tools/build-shells.mjs        # -> build/CONDUCTOR.amxd, build/SENTINEL.amxd
+python3 tools/verify-shells.py     # static review gate — must print CLEAN ×2
+```
+
+The verifier checks the generated JSON against *real* Max 9 object semantics
+(refpages + Ableton's shipped M4L patches): live.remote~ id cords into the
+RIGHT inlet, pattr middle-outlet binding, live.text mode 0=Button/1=Toggle,
+buttons wired direct to messages (button mode emits bang — [sel 1] never
+fires), inlet/outlet ranges, id collisions, the documented init/clock chains,
+and 24/7 grab-slot counts. Run it after any generator change.
+
+Then:
+
+1. Do **§0 (search path)** below — one time, still required so the brains and
+   `server.js` resolve by name.
+2. Drag `build/CONDUCTOR.amxd` onto the **40 Master FX** track, `build/SENTINEL.amxd`
+   onto the **Master** track.
+3. Do **§3 (Live-set prep)** and **§4 (smoke test)** below.
+
+The generator targets the Max-for-Live runtime **9.0.9** (bundled in Live 12) and
+was verified against that bundle's patcher schema + `plugsync~` outlet map. The
+clock is wired correctly-by-construction: `plugsync~` **outlet 6 (raw ticks)** →
+`[/ 480.]` → `[speedlim 33]` → `[prepend sync]` — this resolves the old Q5/C0
+"beats vs ticks" unknown (it's raw ticks; divisor 480). The `.js` brains
+hot-reload (`autowatch = 1`), so a generated shell never needs reopening.
+
+Two things to confirm in the Max editor once (taste/polish, not wiring): the
+device-face `live.*` controls and status displays may want inspector tweaks
+(red text, toggle vs button mode), and `pattr` parameter-mode persistence. Core
+function — clock, grabs, telemetry, init — needs nothing.
+
+Re-run the generator any time; it's idempotent and clobbers `build/`.
+
+---
+
+## Manual path (fallback / reference, ~15 min in the Max editor)
 
 Both devices are **Max Audio Effect** (.amxd) shells whose only job is plumbing:
 clock in, js brain in the middle, live.remote~ pool and telemetry out. All
@@ -36,16 +80,21 @@ processes nothing; it only passes audio through untouched).
         |    \
    (defer)  [message: init] → [js conductor.js] (1 inlet, 3 outlets)
 
-[plugsync~]   (beat-position output, signal)
+[plugsync~]   outlet 6 = raw ticks (cumulative, float — NOT a signal)
    |
-[snapshot~ 33]                          ~30 Hz transport-synced clock
+[/ 480.]                                ticks → beats (Live/Max PPQ = 480)
+   |
+[speedlim 33]                           throttle to ~30 Hz
    |
 [prepend sync] → js inlet               sends "sync <beats_float>"
 ```
 
-plugsync~'s **beats output** is the float position in beats since song start.
-Verify which outlet that is on your Max version (8.x: use the outlet documented
-as "beat count" / ticks and divide if needed — calibration step C0 covers this).
+Confirmed on Max 9.0.9: `plugsync~` has **no signal outlet**, so there's nothing
+for `snapshot~` to sample — drive the chain off **outlet 6 (raw ticks)** instead.
+Raw ticks is cumulative since song start and tempo-independent; `/ 480.` converts
+to beats. (Outlet map: 0 play/stop · 1 bar · 2 beat · 3 tick · 4 timesig · 5 tempo
+· 6 raw ticks · 7 sample count · 8 flags.) If motion runs at the wrong speed,
+this divisor is the C0 calibration knob.
 
 ### Grab pool (outlet 0)
 

@@ -1,7 +1,8 @@
 {
   "meta": {
-    "set": "6.7.3_eduardo_2026_ConductorSentinalTest.als",
+    "set": "6.7.3_eduardo_2026_STAGE_v5.als",
     "generated": "2026-06-11",
+    "names_verified_against_set": "2026-06-12 — all resolve-by-name targets confirmed present with exact names (6 buses, DJ Filter Soft Clip ×6 incl. LeadsBus-inside-rack, 40 Master FX rack, CL#1-6, WhiteNoise/KnobRiser, 42-ShephardsTone, 6 returns, HELIX CAPTURE IN TRIM/FADE, 6 Melodies EQ Three, REC FEED/Cptr). NOT YET ADDED: SENTRIM utilities (0 in set) and CONDUCTOR track + command clips (0 in set).",
     "tempo_default": 94,
     "global_launch_quantization": "1 bar",
     "resolution_rule": "ALWAYS resolve tracks/devices/parameters BY NAME at device load. LOM indices below are hints from the v4 set and WILL drift as tracks are added. Unresolved names must surface in the device UI as red text, never fail silently.",
