@@ -163,14 +163,20 @@ var Resolver = (function () {
     var cands = (typeof nameCandidates === 'string') ? [nameCandidates] : nameCandidates;
     var np = deviceApi.getcount('parameters');
     var dPath = deviceApi.unquotedpath || deviceApi.path.replace(/"/g, '');
+    var seen = [];
     for (var i = 0; i < np; i++) {
       var p = new LiveAPI(dPath + ' parameters ' + i);
       var pn = apiName(p);
+      if (seen.length < 16) seen.push(pn);
       for (var c = 0; c < cands.length; c++) {
         if (pn === cands[c]) return p;
       }
     }
-    noteMissing('param', (label || dPath) + ' / ' + cands.join('|'), 'no parameter with these names');
+    // a device that resolved but won't match tells us nothing without its real
+    // param list — e.g. a newer-version device loading degraded shows 0 params
+    noteMissing('param', (label || dPath) + ' / ' + cands.join('|'),
+      'no parameter with these names; device has ' + np + ' params' +
+      (seen.length ? ': ' + seen.join(', ') + (np > seen.length ? ', ...' : '') : ''));
     return null;
   }
 
