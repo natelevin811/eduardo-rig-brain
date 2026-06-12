@@ -8,8 +8,9 @@ restores, grabs only during ramps, and refuses — at the lowest layer — to ev
 write tempo, transport, or fire a scene (the laptop shares Ableton Link with
 other musicians' rigs).
 
+- **Test it on any machine: `docs/RIG-TEST.md`** ← start here on the gig laptop
 - Spec: `docs/SPEC.md` · Setmap (law): `setmap/eduardo-setmap.json`
-- Build the shells: `docs/SHELL-BUILD.md` (~15 min in the Max editor)
+- Build the shells: `docs/SHELL-BUILD.md` (generated — `node tools/build-shells.mjs`)
 - Calibrate: `docs/CALIBRATION.md` · Show night: `docs/RUNBOOK.md`
 - Prove it: `test/soak-checklist.md` · Current state: `STATUS.md`
 - Dashboard: `http://localhost:7777` once the SENTINEL shell is loaded

@@ -51,7 +51,14 @@ untouched (`autowatch = 1` is already set in both brains).
 
 ## 0. Search path (once)
 
-Max → Options → File Preferences → add these folders (subfolders ON):
+**Fastest way — one symlink, no clicking** (Max searches its User Library
+recursively by default):
+
+```
+ln -sfn ~/code/natelevin/eduardo-rig-brain ~/Documents/Max\ 9/Library/eduardo-rig-brain
+```
+
+Manual alternative: Max → Options → File Preferences → add these folders (subfolders ON):
 
 ```
 eduardo-rig-brain/shared/
