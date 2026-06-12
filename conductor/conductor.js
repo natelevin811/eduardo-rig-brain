@@ -20,7 +20,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-12d transport-poll';
+var BUILD = '2026-06-12e dj-probe';
 (function () {
   var loc = '';
   try {
@@ -823,30 +823,53 @@ function grabtest() {
     if (!S.ready) { dbg('grabtest: not ready (init failed?)'); return; }
     if (S.dryRun) { dbg('grabtest: DRY-RUN is ON — toggle it off to test real writes'); return; }
     if (GRABTEST.slot >= 0) { dbg('grabtest: already running — wait for it to finish'); return; }
-    var info = (REG.send['PadsBus'] || [])[1]; // send B
-    if (!info) { dbg('grabtest: PadsBus send B unresolved'); return; }
-    GRABTEST.info = info;
-    GRABTEST.captured = parseFloat(Resolver.byId(info.id).get('value'));
-    GRABTEST.slot = slotAcquire(info.id);
-    dbg('grabtest: target PadsBus/sndB id=' + info.id + ' captured=' + GRABTEST.captured);
-    dbg('grabtest: acquired slot ' + GRABTEST.slot + ' — sent [' + GRABTEST.slot + ' id ' + info.id + '] out outlet 0');
-    if (GRABTEST.slot < 0) return;
-    var bump = Math.min(info.max, GRABTEST.captured + 0.10 * (info.max - info.min));
-    slotDrive(GRABTEST.slot, bump);
-    dbg('grabtest: drove value ' + bump + ' — the PadsBus send B knob should be moving NOW');
-    Telemetry.alert('grabtest', 'driving PadsBus/sndB to ' + bump + ' via slot ' + GRABTEST.slot);
-    GRABTEST.task = new Task(function () {
-      jailRun('grabtest-end', function () {
-        slotDrive(GRABTEST.slot, GRABTEST.captured);
-        slotRelease(GRABTEST.slot);
-        dbg('grabtest: restored ' + GRABTEST.captured + ' and released slot ' + GRABTEST.slot);
-        dbg('grabtest: if the knob NEVER moved, the live.remote~ pool is the break — check patch cords/inlets');
-        Telemetry.alert('grabtest', 'done — knob moved = pool OK; knob still = pool broken');
-        GRABTEST.slot = -1; // re-arm for the next press
-      });
-    }, this);
-    GRABTEST.task.schedule(1500);
+    grabtestPhase(0);
   });
+}
+
+// Two probes per TEST press, same live.remote~ path the moves use:
+// phase 0 = PadsBus send B (bump +10%), phase 1 = PercBus DJ Control
+// (dip −20% toward LP — BREATH's exact target class). Each restores after
+// 1.5 s. A knob that moves under its probe = pool + binding good for that
+// param; sends moving while DJ stays still isolates a DJ-specific break.
+function grabtestPhase(phase) {
+  var info, label;
+  if (phase === 0) {
+    info = (REG.send['PadsBus'] || [])[1]; // send B
+    label = 'PadsBus/sndB';
+  } else {
+    info = REG.djfilter['PercBus'];
+    label = 'PercBus/DJ Control';
+  }
+  if (!info) {
+    dbg('grabtest: ' + label + ' unresolved');
+    Telemetry.alert('grabtest', label + ' UNRESOLVED — cannot probe');
+    if (phase === 0) grabtestPhase(1);
+    return;
+  }
+  GRABTEST.info = info;
+  GRABTEST.captured = parseFloat(Resolver.byId(info.id).get('value'));
+  GRABTEST.slot = slotAcquire(info.id);
+  dbg('grabtest[' + label + ']: id=' + info.id + ' captured=' + GRABTEST.captured + ' slot=' + GRABTEST.slot);
+  if (GRABTEST.slot < 0) return;
+  var span = info.max - info.min;
+  var target = (phase === 0)
+    ? Math.min(info.max, GRABTEST.captured + 0.10 * span)
+    : Math.max(info.min, GRABTEST.captured - 0.20 * span);
+  slotDrive(GRABTEST.slot, target);
+  dbg('grabtest[' + label + ']: drove ' + target + ' — the knob should be moving NOW');
+  Telemetry.alert('grabtest', label + ' driving to ' + target + ' via slot ' + GRABTEST.slot);
+  GRABTEST.task = new Task(function () {
+    jailRun('grabtest-end', function () {
+      slotDrive(GRABTEST.slot, GRABTEST.captured);
+      slotRelease(GRABTEST.slot);
+      dbg('grabtest[' + label + ']: restored ' + GRABTEST.captured + ' and released slot ' + GRABTEST.slot);
+      Telemetry.alert('grabtest', label + ' done — knob moved = pool OK; knob still = pool broken');
+      GRABTEST.slot = -1; // re-arm
+      if (phase === 0) grabtestPhase(1);
+    });
+  }, this);
+  GRABTEST.task.schedule(1500);
 }
 
 // ABORT button — kill-order layer 2. Immediate clean slate, no bar wait.
