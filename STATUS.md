@@ -78,23 +78,35 @@ are now parked and applied after resolve).
    load-bearing; the rest are taste.
 3. **Soak** (test/soak-checklist.md). Living-room law: doesn't pass → v4 plays.
 
-## Open questions (setmap ambiguities — built around, flagged at runtime)
+## Open questions (setmap ambiguities)
 
-- **Q1: "6 Melodies" / EQ Three** — named in the spec's RITUAL but absent from
-  the setmap. RITUAL resolves it by name and skips with a red card line if
-  missing. Add the track/device to the setmap if it should be law.
-- **Q2: HELIX capture marks** — RITUAL expects `setmap.ritual.helix_marks`
-  (schema in CALIBRATION.md C9). Setmap has no such block yet; the ritual card
-  shows the gap until calibrated values are written in.
-- **Q3: capture tracks** — "REC FEED and Cptr tracks" have no setmap entries;
-  RITUAL pattern-matches track names containing `Cptr` / `REC FEED` for the
-  Monitor-In fix. Confirm those substrings match the real track names.
-- **Q4: SENTRIM Gain units** — code assumes Utility Gain is dB-native
-  (min ≈ -35). C8 step 2 verifies; if it reads 0..1 a mapping is needed in
-  `writeTrim` (one function).
+### Resolved 2026-06-11 (gig-laptop session, set open)
+
+- **Q1: "6 Melodies" / EQ Three** — ✅ RESOLVED. Track name confirmed `6 Melodies`,
+  device `EQ Three`, unity = all three gains 1.0. Added to setmap as
+  `ritual.eq_three_unity` (documented law). Code unchanged — the RITUAL fix
+  already sets these via `default_value`, which equals unity.
+- **Q2: HELIX capture marks** — ✅ RESOLVED. `setmap.ritual.helix_marks` written
+  with values read directly off the gig set: track `HELIX CAPTURE IN`,
+  `TRIM` Gain **7.78 dB**, `FADE` Gain **−5.89 dB** (param `Gain`). FADE is
+  −5.89, not the 0 dB first recalled — confirmed −5.89 is the intended mark.
+- **Q4: SENTRIM Gain units** — ✅ RESOLVED by observation. The HELIX Utility
+  `Gain` params display in dB in the device UI, so Utility Gain is dB-native.
+  SENTRIM is the same Utility device type → dB-native, no `writeTrim` remap
+  needed. C8 step 2 remains a formality (confirm min ≈ −35); no mapping expected.
+
+### Still open
+
+- **Q3: capture tracks** — RITUAL's Monitor-In fix pattern-matches track names
+  containing `Cptr` / `REC FEED`. Verify those substrings match the real track
+  names (quick check with the set open).
 - **Q5: plugsync~ outlet scaling** — beats vs ticks differs by Max version;
-  C0 catches it (worst case: one `[/ 480.]` in each shell).
-- **Q6: BLOOM/SUNRISE send return-shape** — spec says sends "rise slightly";
-  I return them to captured over the last quarter of the move (nothing may end
-  displaced except NIGHTFALL/DISSOLVE which the spec marks as holds). Confirm
-  musically.
+  needs the device running in Max (C0). Worst case: one `[/ 480.]` per shell.
+- **Q6: BLOOM/SUNRISE send return-shape** — current build returns sends to
+  captured over the last quarter of the move (nothing ends displaced except
+  NIGHTFALL/DISSOLVE holds). **Resolve in the room** by ear.
+
+### Resolve in the room
+
+- **Reset phases** — RITUAL/restore phase tuning to be finalized in the actual
+  venue room (per 2026-06-11 session). Q6 folds into this.

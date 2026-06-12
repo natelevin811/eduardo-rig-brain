@@ -117,5 +117,20 @@
     "curves": "ambient set: default exponential-ease (slow start, slow end). No linear zipper ramps on filters.",
     "rate": "parameter updates at 30-60 Hz from a transport-synced clock; bar-aligned start/end via plugsync~ beat position",
     "collision": "one move per parameter at a time; a new move on a busy param cancels and supersedes cleanly; CLEAN SLATE supersedes everything"
+  },
+
+  "ritual": {
+    "_doc": "RITUAL restore values. helix_marks is consumed by sentinel.js _ritual 'HELIX capture marks' fix. Values read directly off the gig set 2026-06-11 — Utility Gain is dB-native (confirmed in the device UI; resolves STATUS Q4, no writeTrim remap needed). eq_three_unity documents the hardcoded '6 Melodies' EQ Three fix as law (Q1); the code sets those via default_value (== unity) and is unchanged.",
+    "helix_marks": [
+      { "track": "HELIX CAPTURE IN", "device": "TRIM", "param": "Gain", "value": 7.78 },
+      { "track": "HELIX CAPTURE IN", "device": "FADE", "param": "Gain", "value": -5.89 }
+    ],
+    "eq_three_unity": {
+      "track": "6 Melodies",
+      "device": "EQ Three",
+      "params": ["GainLo", "GainMid", "GainHi"],
+      "value": 1.0,
+      "_note": "Unity = all three gains at 1.0."
+    }
   }
 }
