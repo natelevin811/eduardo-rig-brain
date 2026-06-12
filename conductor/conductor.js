@@ -20,7 +20,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-12f probe-guard';
+var BUILD = '2026-06-12g drive-trace';
 (function () {
   var loc = '';
   try {
@@ -620,12 +620,26 @@ function _sync(beats) {
       var lane = mv.lanes[i];
       if (lane.done) continue;
       var v = laneValueAt(lane, bars);
+      lane.lastV = v;
       if (bars >= lane.laneBars) {
         slotDrive(lane.slot, v);   // land exactly on the endpoint
         slotRelease(lane.slot);    // grab only during ramps — release immediately
         lane.done = true;
       } else {
         slotDrive(lane.slot, v);
+      }
+    }
+
+    // drive trace (REHEARSE only): one line per lane per bar — the exact value
+    // handed to live.remote~ plus the param's native range. NaN or a value
+    // stuck at one end here indicts the math; clean sweeps indict the binding.
+    var dbgBar = Math.floor(bars);
+    if (mv.dbgBar !== dbgBar) {
+      mv.dbgBar = dbgBar;
+      for (i = 0; i < mv.lanes.length; i++) {
+        var ln = mv.lanes[i];
+        if (!ln.done) dbg('drive[' + ln.label + '] slot=' + ln.slot + ' v=' + ln.lastV +
+          ' native[' + ln.info.min + '..' + ln.info.max + '] captured=' + ln.captured);
       }
     }
 
