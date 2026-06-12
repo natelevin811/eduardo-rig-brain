@@ -91,7 +91,12 @@
   /* ---- bottom: alerts + ritual ---- */
   #bottom { display: flex; gap: 10px; height: 132px; }
   #alerts { flex: 2; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
-            padding: 8px 12px; overflow: hidden; }
+            padding: 8px 12px; overflow-y: auto; }
+  .alertLine.replay { color: var(--dim); }
+  .alertLine.old { opacity: .45; }
+  #alertClear { float: right; font: inherit; font-size: 9px; color: var(--dim); background: none;
+                border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; cursor: pointer; }
+  #alertClear:hover { color: var(--teal); border-color: var(--teal); }
   #alerts.clean { border-color: var(--green); padding: 0; height: 6px; flex: 2;
                   background: var(--green); align-self: flex-end; }
   #alerts.clean * { display: none; }
@@ -143,7 +148,7 @@
 </div>
 
 <div id="bottom">
-  <div id="alerts" class="clean"><h3>alerts</h3><div id="alertList"></div></div>
+  <div id="alerts" class="clean"><h3>alerts <button id="alertClear" onclick="clearAlerts()">clear</button></h3><div id="alertList"></div></div>
   <div id="ritual"><h3>ritual</h3><div id="ritList"><div class="rit" style="color:var(--dim)">not yet run</div></div></div>
 </div>
 
@@ -205,13 +210,26 @@ function drawSpark(b) {
 
 function setFlag(id, on) { document.getElementById(id).classList.toggle('on', !!on); }
 
+// Alerts arriving within 1.5 s of (re)connect are the server's state REPLAY,
+// not new events — mark them ↻ and dim them so history reads as history.
+let connectedAt = 0;
 function pushAlert(kind, detail) {
-  state.alerts.unshift({ kind, detail, at: new Date().toLocaleTimeString() });
-  state.alerts = state.alerts.slice(0, 6);
-  const el = document.getElementById('alertList');
-  el.innerHTML = state.alerts.map(a =>
-    `<div class="alertLine"><span class="k">${a.at} ${a.kind}</span> ${a.detail}</div>`).join('');
+  const replay = connectedAt > 0 && Date.now() - connectedAt < 1500;
+  state.alerts.unshift({ kind, detail, at: new Date().toLocaleTimeString(), ts: Date.now(), replay });
+  state.alerts = state.alerts.slice(0, 40);
+  renderAlerts();
   document.getElementById('alerts').classList.remove('clean');
+}
+function renderAlerts() {
+  const now = Date.now();
+  document.getElementById('alertList').innerHTML = state.alerts.map(a =>
+    `<div class="alertLine${a.replay ? ' replay' : ''}${now - a.ts > 120000 ? ' old' : ''}">` +
+    `<span class="k">${a.replay ? '↻ ' : ''}${a.at} ${a.kind}</span> ${a.detail}</div>`).join('');
+}
+function clearAlerts() {
+  state.alerts = [];
+  document.getElementById('alertList').innerHTML = '';
+  document.getElementById('alerts').classList.add('clean');
 }
 
 // ---- event handling -------------------------------------------------------
@@ -344,6 +362,7 @@ setInterval(() => {
   } else if (!es.failed) {
     banner.classList.remove('show');
   }
+  if (state.alerts.length) renderAlerts(); // refresh ↻/age dimming
 }, 500);
 
 // ---- SSE — one-way in, auto-reconnect ---------------------------------------
@@ -358,7 +377,11 @@ function connect() {
     banner.textContent = 'TELEMETRY LINK DOWN — devices unaffected, reconnecting…';
     banner.classList.add('show');
   };
-  src.onopen = () => { es.failed = false; };
+  src.onopen = () => {
+    if (connectedAt > 0) pushAlert('link', 'reconnected — ↻ entries are replayed history, not new events');
+    connectedAt = Date.now();
+    es.failed = false;
+  };
 }
 connect();
 </script>
