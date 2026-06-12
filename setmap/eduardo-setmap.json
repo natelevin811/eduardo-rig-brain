@@ -1,0 +1,121 @@
+{
+  "meta": {
+    "set": "6_7_3_eduardo_2026_STAGE_v4.als",
+    "generated": "2026-06-11",
+    "tempo_default": 94,
+    "global_launch_quantization": "1 bar",
+    "resolution_rule": "ALWAYS resolve tracks/devices/parameters BY NAME at device load. LOM indices below are hints from the v4 set and WILL drift as tracks are added. Unresolved names must surface in the device UI as red text, never fail silently.",
+    "buffer": 128,
+    "note": "All control is parameter-rate. Nothing in this system inserts audio processing."
+  },
+
+  "buses": [
+    { "name": "LoDrumsBus",  "lom_hint": 33, "dj_filter_device": "DJ Filter Soft Clip", "sentinel_trim": "ADD: Utility named 'SENTRIM' at end of chain", "conductor_filter_allowed": false, "notes": "low end anchor. Conductor never filters this bus. Sentinel may trim -2dB max." },
+    { "name": "HiDrumsBus",  "lom_hint": 34, "dj_filter_device": "DJ Filter Soft Clip", "sentinel_trim": "ADD Utility 'SENTRIM'" },
+    { "name": "PercBus",     "lom_hint": 35, "dj_filter_device": "DJ Filter Soft Clip", "sentinel_trim": "ADD Utility 'SENTRIM'" },
+    { "name": "BassBus",     "lom_hint": 36, "dj_filter_device": "DJ Filter Soft Clip", "sentinel_trim": "ADD Utility 'SENTRIM'", "conductor_filter_floor": 0.0, "notes": "kick sidechain glue lives here. Conductor may NOT low-pass below center; HP moves only, and only in BREATH." },
+    { "name": "PadsBus",     "lom_hint": 37, "dj_filter_device": "DJ Filter Soft Clip", "sentinel_trim": "ADD Utility 'SENTRIM'" },
+    { "name": "LeadsBus",    "lom_hint": 38, "dj_filter_device": "DJ Filter Soft Clip", "dj_filter_location": "INSIDE the bus rack chain, not top level", "sentinel_trim": "ADD Utility 'SENTRIM'" }
+  ],
+
+  "dj_filter_param": {
+    "device_name": "DJ Filter Soft Clip",
+    "param_name_candidates": ["DJ Control", "DjControl"],
+    "center_detent": 0.0,
+    "range": [-1.0, 1.0],
+    "polarity": "negative = low-pass closes, positive = high-pass rises (VERIFY in calibration pass and correct here)"
+  },
+
+  "master_fx": {
+    "track": "40 Master FX",
+    "lom_hint": 39,
+    "rack": "Nate & Will Master FX",
+    "macros": [
+      { "index": 0, "name": "Fade",          "rest": 0.0, "calibrate": "direction + audible range" },
+      { "index": 1, "name": "HPF",           "rest": 0.0 },
+      { "index": 2, "name": "LPF",           "rest": 0.0 },
+      { "index": 3, "name": "Riser",         "rest": 0.0 },
+      { "index": 4, "name": "Filt Delay",    "rest": 0.0 },
+      { "index": 5, "name": "PingPong Delay","rest": 0.0, "notes": "inner Delay device saved drywet=0.5; macro presumably gates it. Verify rest state is silent." },
+      { "index": 11, "name": "Metallica",    "rest": 0.0, "conductor_use": false, "notes": "unknown character. Calibrate before any move uses it." }
+    ],
+    "bypassed_buses": ["LoDrumsBus", "BassBus", "One Shots"],
+    "notes": "Master FX only touches HiDrums/Perc/Pads/Leads. Master macro moves never affect bass or low drums. Design moves accordingly."
+  },
+
+  "risers": [
+    { "name": "WhiteNoise", "lom_hint": 40, "instrument_rack": "KnobRiser", "macro": { "index": 0, "name": "Riser", "rest": 0.0 }, "clips": "16 identical 'P-LASK Noise Generator' MIDI clips in session", "use": "fire any clip + ramp macro; kill clip and zero macro at move end" },
+    { "name": "42-ShephardsTone", "lom_hint": 41, "instrument_rack": "(unnamed InstrumentGroupDevice)", "control": "track volume swell (current 0.949 lin = -0.45 dB rest)", "use": "infinite-rise illusion for long builds; swell in over n bars, out over n/2" }
+  ],
+
+  "returns_send_index": [
+    { "send": 0, "name": "A-Small Room | EQ Eight" },
+    { "send": 1, "name": "B-Large Hall | EQ Eight" },
+    { "send": 2, "name": "C-Allen-A-Verb", "plugin": "ValhallaVintageVerb" },
+    { "send": 3, "name": "D-Allen-B-Delay" },
+    { "send": 4, "name": "E-Allen-C-Rubadub" },
+    { "send": 5, "name": "F-Allen-D-Hangup" }
+  ],
+
+  "loop_lanes": [
+    { "name": "CL#1 Perc",  "lom_hint": 8,  "bus": "PercBus" },
+    { "name": "CL#2 Dr Hi", "lom_hint": 9,  "bus": "HiDrumsBus" },
+    { "name": "CL#3 BASS",  "lom_hint": 10, "bus": "BassBus" },
+    { "name": "CL#4 PAD",   "lom_hint": 11, "bus": "PadsBus" },
+    { "name": "CL#5 LEAD",  "lom_hint": 12, "bus": "LeadsBus" },
+    { "name": "CL#6 LEAD",  "lom_hint": 13, "bus": "LeadsBus" }
+  ],
+  "loop_lane_rules": "DISSOLVE/SWELL moves use CL track volumes ONLY. Loops fade, live playing through the same buses is untouched. Never stop/fire CL clips except in CLEAN SLATE, and CLEAN SLATE must restore all CL faders to 0 dB after stopping clips.",
+
+  "hands_off": {
+    "never_touch": [
+      "any track fader except CL lanes and riser tracks",
+      "HELIX CAPTURE IN devices (TRIM/FADE utilities)",
+      "all REC FEED and Cptr tracks",
+      "Main track devices and Main fader",
+      "crossfader (performer-owned, musical)",
+      "bus rack internal devices (glue/limiter/EQ voicing)",
+      "Twister-owned synth chain macros (16/17/18/19 chains)"
+    ],
+    "conductor_owns": ["bus DJ Control params", "Master FX macros 0-5", "bus sends 0-5", "CL lane volumes", "riser track volume + KnobRiser macro + riser clips"],
+    "sentinel_owns": ["SENTRIM utility Gain on each bus, nothing else"]
+  },
+
+  "sentinel_targets": {
+    "meter_source": "output_meter_level on each bus track + Main",
+    "main_peak_ceiling": 0.92,
+    "bus_trim_clamp_db": [-3.0, 0.0],
+    "lodrums_trim_clamp_db": [-2.0, 0.0],
+    "slew_max_db_per_sec": 0.5,
+    "deadband_db": 0.8,
+    "attack_window_sec": 4.0,
+    "release_window_sec": 12.0,
+    "behavior": "only trim when Main is near ceiling AND one bus has held dominant share through the attack window; release trims slowly toward 0 when headroom returns. Never boost above 0."
+  },
+
+  "conductor_interface": {
+    "command_track": "CREATE: MIDI track named 'CONDUCTOR', no output, collapsed, placed last",
+    "command_clips": "empty named MIDI clips; launching one = issuing the command; device observes playing_slot_index; device stops the clip when the move completes",
+    "why": "zero new MIDI mappings; commands appear as labeled pads on Push 3 session grid and on both iPads; global 1-bar quantize makes every command land on the bar line",
+    "clip_name_grammar": "MOVE [bars] e.g. 'WASH 16', 'TIDE OUT 32', 'BREATH 8', 'CLEAN SLATE'"
+  },
+
+  "move_library": [
+    { "name": "WASH",       "default_bars": 16, "action": "raise sends B + C on PadsBus/LeadsBus/PercBus to wet target over n bars, hold 4, return to captured values over n/2" },
+    { "name": "TIDE OUT",   "default_bars": 32, "action": "Master Fade macro + gentle LPF over n bars to near-silence on the four FX buses, hold 2 bars, restore over n/2. Bass and low drums remain (they bypass Master FX) = the floor keeps breathing under the tide." },
+    { "name": "BREATH",     "default_bars": 8,  "action": "LP close DJ filters on HiDrums/Perc/Pads/Leads over n/2, release over n/2. BassBus untouched. The underwater inhale." },
+    { "name": "BLOOM",      "default_bars": 16, "action": "start LPF closed via Master LPF macro, open over n bars while send B rises slightly, all returned at end" },
+    { "name": "RISE",       "default_bars": 16, "action": "fire WhiteNoise clip + KnobRiser macro 0 to 1 over n bars, ShephardsTone volume swell in parallel; at bar n: kill clip, zero macro, duck ShephardsTone over 2 bars" },
+    { "name": "DISSOLVE",   "default_bars": 16, "action": "all six CL lane volumes fade to -inf over n bars. Loops evaporate, live stays. Faders snap back to 0 dB only on CLEAN SLATE or 'DISSOLVE BACK'" },
+    { "name": "DISSOLVE BACK", "default_bars": 8, "action": "CL lane volumes ramp back to 0 dB over n bars" },
+    { "name": "CLEAN SLATE", "default_bars": 0, "action": "stop all CL clips, restore CL faders to 0, center all DJ filters, zero conductor-owned macros, release all grabs. The reset button. Executes on next bar line." }
+  ],
+
+  "ramp_engine_rules": {
+    "capture_restore": "Every move captures the current value of each parameter it touches before moving it, and returns to the CAPTURED value, not an assumed default. This honors wherever Nate's hands left the Twister/XL.",
+    "grab_policy": "live.remote~ grab only for the duration of the ramp on that parameter, release immediately at move end or CLEAN SLATE",
+    "curves": "ambient set: default exponential-ease (slow start, slow end). No linear zipper ramps on filters.",
+    "rate": "parameter updates at 30-60 Hz from a transport-synced clock; bar-aligned start/end via plugsync~ beat position",
+    "collision": "one move per parameter at a time; a new move on a busy param cancels and supersedes cleanly; CLEAN SLATE supersedes everything"
+  }
+}
