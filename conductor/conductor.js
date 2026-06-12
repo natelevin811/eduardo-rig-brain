@@ -758,6 +758,22 @@ var GRABTEST = { task: null, info: null, captured: 0, slot: -1 };
 
 function grabtest() {
   jailRun('grabtest', function () {
+    // clock probe first, before any gate — reports what the brain sees even
+    // when init failed or DRY-RUN is on. Press TEST twice ~5 s apart: if
+    // song_time doesn't change between presses, this Live set isn't playing.
+    var ip = 'ERR', cst = 'ERR';
+    try { ip = String(new LiveAPI('live_set').get('is_playing')); } catch (e1) {}
+    try { cst = String(new LiveAPI('live_set').get('current_song_time')); } catch (e2) {}
+    var extAge = CLOCK.lastExtSyncMs ? (nowMs() - CLOCK.lastExtSyncMs) : -1;
+    var probe = 'clock probe: is_playing=' + ip + ' song_time=' + cst +
+      ' nowBeats=' + S.nowBeats +
+      ' extSync=' + (extAge < 0 ? 'never' : Math.round(extAge) + 'ms ago') +
+      ' clockTask=' + (CLOCK.task ? 'on' : 'OFF') +
+      ' ready=' + (S.ready ? 1 : 0) +
+      ' jailErrs=' + JAIL.total + (JAIL.disabled ? ' DISABLED' : '');
+    dbg(probe);
+    Telemetry.alert('clockprobe', probe);
+
     if (!S.ready) { dbg('grabtest: not ready (init failed?)'); return; }
     if (S.dryRun) { dbg('grabtest: DRY-RUN is ON — toggle it off to test real writes'); return; }
     if (GRABTEST.slot >= 0) { dbg('grabtest: already running — wait for it to finish'); return; }
