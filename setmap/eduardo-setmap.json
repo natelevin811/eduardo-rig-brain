@@ -20,7 +20,7 @@
 
   "dj_filter_param": {
     "device_name": "DJ Filter Soft Clip",
-    "param_name_candidates": ["DJ Control", "DjControl"],
+    "param_name_candidates": ["Control", "DJ Control", "DjControl"],
     "center_detent": 0.0,
     "range": [-1.0, 1.0],
     "polarity": "negative = low-pass closes, positive = high-pass rises (VERIFY in calibration pass and correct here)"
