@@ -84,6 +84,8 @@
 
   "sentinel_targets": {
     "meter_source": "output_meter_level on each bus track + Main",
+    "utility_gain_param_candidates": ["Gain", "Output"],
+    "_utility_gain_doc": "Utility's gain knob is exposed to the LOM as 'Gain' on the build machine but as 'Output' on the performance machine's Live build (observed 2026-06-12: 12-param list with Output, no Gain). Both names accepted wherever a Utility gain is resolved (SENTRIM x6, HELIX TRIM/FADE marks).",
     "main_peak_ceiling": 0.92,
     "bus_trim_clamp_db": [-3.0, 0.0],
     "lodrums_trim_clamp_db": [-2.0, 0.0],
