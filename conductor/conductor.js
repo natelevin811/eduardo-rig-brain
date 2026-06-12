@@ -514,7 +514,7 @@ function laneValueAt(lane, bars) {
 // polls live_set current_song_time (in BEATS). This is a READ — Link-safe;
 // writing it is refused by the resolver's FORBIDDEN_PROPS. If real plugsync~
 // sync messages arrive, they win and the fallback stands down.
-var CLOCK = { task: null, lastExtSyncMs: 0 };
+var CLOCK = { task: null, lastExtSyncMs: 0, extTrusted: false, checkCount: 0 };
 
 function startClock() {
   if (CLOCK.task) return;
@@ -532,7 +532,28 @@ function clockTick() {
   });
 }
 
+// TRUST GATE (perf machine 2026-06-12): plugsync~ outlet maps differ between
+// Max runtimes — on the performance machine the wired outlet already delivers
+// BEATS, so the shell's /480 made the engine clock crawl at 1/480th speed
+// while the fresh-but-wrong messages kept the fallback poll standing down.
+// External sync is believed only while it tracks live_set current_song_time;
+// rejected sync is dropped WITHOUT refreshing lastExtSyncMs so the fallback
+// poll drives the engine instead. Re-validates forever — trust can recover.
 function sync(beats) {
+  var trustedBefore = CLOCK.extTrusted;
+  CLOCK.checkCount++;
+  if (!CLOCK.extTrusted || CLOCK.checkCount >= 15) { // every msg until trusted, then ~2x/s
+    CLOCK.checkCount = 0;
+    if (REG.liveSet) {
+      var cst = parseFloat(REG.liveSet.get('current_song_time'));
+      if (!isNaN(cst)) CLOCK.extTrusted = Math.abs(beats - cst) <= 2;
+    }
+    if (CLOCK.extTrusted !== trustedBefore) {
+      dbg(CLOCK.extTrusted ? 'ext sync trusted — tracks song_time'
+        : 'ext sync REJECTED — does not track song_time; fallback clock takes over');
+    }
+  }
+  if (!CLOCK.extTrusted) return;
   CLOCK.lastExtSyncMs = nowMs();
   jailRun('sync', _sync, [beats]);
 }
