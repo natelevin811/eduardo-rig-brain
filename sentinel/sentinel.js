@@ -145,7 +145,9 @@ function _init() {
     var t = Resolver.track(bdef.name);
     if (!t) continue;
     var trimDev = Resolver.device(bdef.name, 'SENTRIM', t);
-    var trimParam = Resolver.param(trimDev, 'Gain', bdef.name + '/SENTRIM');
+    var trimParam = Resolver.param(trimDev,
+      S.cfg.utility_gain_param_candidates || ['Gain', 'Output'],
+      bdef.name + '/SENTRIM');
     var clampLow = (bdef.name === 'LoDrumsBus')
       ? S.cfg.lodrums_trim_clamp_db[0] : S.cfg.bus_trim_clamp_db[0];
     S.buses.push({
@@ -597,7 +599,10 @@ function _ritual() {
       var mk = marks[k];
       var t = Resolver.track(mk.track);
       var d = Resolver.device(mk.track, mk.device, t);
-      var p = Resolver.param(d, mk.param, mk.track + '/' + mk.device);
+      var pNames = (mk.param === 'Gain')
+        ? (S.cfg.utility_gain_param_candidates || ['Gain', 'Output'])
+        : mk.param;
+      var p = Resolver.param(d, pNames, mk.track + '/' + mk.device);
       if (!p) throw new Error(mk.track + '/' + mk.device + '/' + mk.param);
       Resolver.set(p, 'value', mk.value);
     }

@@ -1,5 +1,25 @@
 # STATUS.md — build status (updated 2026-06-12, post first-rig-test fixes)
 
+## Performance-machine migration (2026-06-12 afternoon)
+
+The performance machine's Live build exposes Utility's gain knob to the LOM as
+**`Output`**, not `Gain` (param dump: 12 params, `... Balance, Output, Mute,
+DC Filter` — no `Gain`). That single rename explained all 7 unresolved names
+(SENTRIM ×6 + HELIX TRIM) and the failing HELIX-marks ritual step. Fix:
+`sentinel_targets.utility_gain_param_candidates = ["Gain","Output"]` in the
+setmap (law), consumed at both Utility-gain call sites in sentinel.js. The
+resolver also now lists a device's actual param names whenever a param fails
+to resolve — that diagnostic is what caught this.
+
+**Verify on the rig after pulling** (re-drag SENTINEL): ritual should show
+HELIX marks ✓ and 0 unresolved; then eyeball that SENTRIM knobs physically sit
+at 0 dB and HELIX TRIM at 7.78 dB — dB-nativeness of `Output` on this Live
+build is assumed from Q4 but not yet observed (if knobs slam to an extreme,
+it's a unit remap, report it). Earlier in the session the same machine was
+running pre-fix code via a stale iCloud copy (filters slammed to −100%,
+dead clock) — resolved by pulling the branch; treat git, not iCloud, as the
+delivery channel.
+
 ## First rig test (2026-06-12) — what broke, what's fixed
 
 Live test on the gig laptop surfaced four real failures; all fixed, reviewed
