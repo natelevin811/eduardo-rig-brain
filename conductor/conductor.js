@@ -20,7 +20,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-12e dj-probe';
+var BUILD = '2026-06-12f probe-guard';
 (function () {
   var loc = '';
   try {
@@ -823,6 +823,8 @@ function grabtest() {
     if (!S.ready) { dbg('grabtest: not ready (init failed?)'); return; }
     if (S.dryRun) { dbg('grabtest: DRY-RUN is ON — toggle it off to test real writes'); return; }
     if (GRABTEST.slot >= 0) { dbg('grabtest: already running — wait for it to finish'); return; }
+    if (GRABTEST.running) { dbg('grabtest: probe sequence already running — wait ~4s'); return; }
+    GRABTEST.running = true;
     grabtestPhase(0);
   });
 }
@@ -844,14 +846,14 @@ function grabtestPhase(phase) {
   if (!info) {
     dbg('grabtest: ' + label + ' unresolved');
     Telemetry.alert('grabtest', label + ' UNRESOLVED — cannot probe');
-    if (phase === 0) grabtestPhase(1);
+    if (phase === 0) grabtestPhase(1); else GRABTEST.running = false;
     return;
   }
   GRABTEST.info = info;
   GRABTEST.captured = parseFloat(Resolver.byId(info.id).get('value'));
   GRABTEST.slot = slotAcquire(info.id);
   dbg('grabtest[' + label + ']: id=' + info.id + ' captured=' + GRABTEST.captured + ' slot=' + GRABTEST.slot);
-  if (GRABTEST.slot < 0) return;
+  if (GRABTEST.slot < 0) { if (phase === 0) grabtestPhase(1); else GRABTEST.running = false; return; }
   var span = info.max - info.min;
   var target = (phase === 0)
     ? Math.min(info.max, GRABTEST.captured + 0.10 * span)
@@ -866,7 +868,7 @@ function grabtestPhase(phase) {
       dbg('grabtest[' + label + ']: restored ' + GRABTEST.captured + ' and released slot ' + GRABTEST.slot);
       Telemetry.alert('grabtest', label + ' done — knob moved = pool OK; knob still = pool broken');
       GRABTEST.slot = -1; // re-arm
-      if (phase === 0) grabtestPhase(1);
+      if (phase === 0) grabtestPhase(1); else GRABTEST.running = false;
     });
   }, this);
   GRABTEST.task.schedule(1500);
