@@ -94,7 +94,38 @@ Then `git pull` in the repo.
 - "buffer = 128" / "Link Start Stop Sync OFF" — not API-readable; check Live
   prefs by hand once.
 
-## 7. After a good run
+## 7. Remote debug loop (performing machine ↔ browser Claude ↔ GitHub)
+
+When debugging from the performance machine with fixes authored elsewhere
+(e.g., Claude Code in the browser pushing to this repo), the loop is:
+
+1. **Capture evidence** on the performance machine: copy the Max console lines
+   (Max window → right-click device title bar → Open Max Window) and the
+   dashboard alert lane text. Paste them to whoever/whatever is writing the fix.
+2. **Fix lands on GitHub** (branch or main — agree which).
+3. **On the performance machine, pull:**
+
+   ```
+   cd ~/code/natelevin/eduardo-rig-brain && git pull
+   ```
+
+4. **What happens next depends on WHAT changed** (check the pull output):
+
+   | Files changed | What you do |
+   |---|---|
+   | `conductor/*.js`, `sentinel/*.js`, `shared/*.js` | **Nothing.** autowatch recompiles and the brains self-re-init ~0.3 s later. Watch the Max console for the re-init posts. Re-set SHOW mode if you were in SHOW (recompile resets to REHEARSE). |
+   | `setmap/eduardo-setmap.json` only | Brains re-read the setmap only at init — easiest trigger: `touch conductor/conductor.js sentinel/sentinel.js` (forces recompile → self-init). |
+   | `dashboard/server.js` / `index.html` | node.script watches — dashboard restarts itself; reload the browser tab. |
+   | `build/*.amxd` | Delete the old device in Live, drag the new one in from `build/`, re-set mode. (Rare — only when the shell wiring itself changed.) |
+   | `tools/*` or `docs/*` only | Nothing to do in Live. |
+
+5. **Verify the fix** with the relevant §4 test, paste the new console output
+   back if it's still wrong.
+
+Anyone driving the CLI on the performance machine can follow this table
+verbatim — it requires no knowledge of the codebase.
+
+## 8. After a good run
 
 Save the set (still as v6 or bump to v7 — v5 stays untouched forever), then
 run the full living-room soak: `test/soak-checklist.md`. Living-room law:

@@ -709,3 +709,13 @@ function applyTrims(trims) {
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// self-init on (re)compile — autowatch re-compiles on `git pull` but does NOT
+// re-fire the shell's init message; without this a hot-reloaded brain is dead
+// until re-init. _init is idempotent (guarded observers/tasks, grab release).
+// NOTE: recompile resets state to REHEARSE defaults — re-set SHOW after any
+// mid-show hot-reload.
+// ---------------------------------------------------------------------------
+var BOOT_TASK = new Task(function () { jailRun('compile-init', _init); }, this);
+BOOT_TASK.schedule(300);

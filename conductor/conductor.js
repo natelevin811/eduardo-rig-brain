@@ -822,3 +822,15 @@ function setvalueof(v) {
     uiOut('alive', 0);
   });
 }
+
+// ---------------------------------------------------------------------------
+// self-init on (re)compile — the remote-debug loop is `git pull` + autowatch,
+// and autowatch re-compiles WITHOUT re-firing live.thisdevice/init. Without
+// this, a hot-reloaded brain sits dead until something sends init. _init is
+// idempotent (guarded observers, grab release, retry-safe), so the extra call
+// at first load (alongside the shell's deferred init message) is harmless.
+// NOTE: a recompile resets state — mode returns to REHEARSE, dry-run off;
+// re-set SHOW mode after any mid-show hot-reload.
+// ---------------------------------------------------------------------------
+var BOOT_TASK = new Task(function () { jailRun('compile-init', _init); }, this);
+BOOT_TASK.schedule(300);
