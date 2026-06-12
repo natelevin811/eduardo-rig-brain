@@ -453,7 +453,7 @@ function busAvgDb(b, bars) {
 // on the rig — heartbeats never fired. The 10 Hz tick polls live_set
 // current_song_time (BEATS — a READ; writes to it are refused by the resolver's
 // FORBIDDEN_PROPS) whenever real sync messages go quiet; real plugsync~ wins.
-var CLOCK = { lastExtSyncMs: 0 };
+var CLOCK = { lastExtSyncMs: 0, extTrusted: false, checkCount: 0 };
 
 function clockFallback() {
   if (nowMs() - CLOCK.lastExtSyncMs < 500) return;
@@ -461,7 +461,23 @@ function clockFallback() {
   if (!isNaN(b)) _sync(b);
 }
 
+// TRUST GATE — same law as the conductor's (see conductor.js sync()): external
+// plugsync~ sync is believed only while it tracks live_set current_song_time.
 function sync(beats) {
+  var trustedBefore = CLOCK.extTrusted;
+  CLOCK.checkCount++;
+  if (!CLOCK.extTrusted || CLOCK.checkCount >= 15) {
+    CLOCK.checkCount = 0;
+    if (REG.liveSetClock) {
+      var cst = parseFloat(REG.liveSetClock.get('current_song_time'));
+      if (!isNaN(cst)) CLOCK.extTrusted = Math.abs(beats - cst) <= 2;
+    }
+    if (CLOCK.extTrusted !== trustedBefore) {
+      dbg(CLOCK.extTrusted ? 'ext sync trusted — tracks song_time'
+        : 'ext sync REJECTED — does not track song_time; fallback clock takes over');
+    }
+  }
+  if (!CLOCK.extTrusted) return;
   CLOCK.lastExtSyncMs = nowMs();
   jailRun('sync', _sync, [beats]);
 }
