@@ -18,6 +18,18 @@ autowatch = 1;
 inlets = 1;
 outlets = 3;
 
+// BUILD stamp: posts on every compile (load AND autowatch recompile) so the
+// Max window always shows which file revision is actually running.
+var BUILD = '2026-06-12c trust-gate';
+(function () {
+  var loc = '';
+  try {
+    var f = new File(jsarguments[0]); // resolves via the search path — shows WHICH copy
+    if (f.isopen) { loc = ' @ ' + f.foldername; f.close(); }
+  } catch (e) {}
+  post('[conductor] build ' + BUILD + loc + '\n');
+})();
+
 include("resolver.js");
 include("telemetry.js");
 include("moves.js");
@@ -786,7 +798,7 @@ function grabtest() {
     try { ip = String(new LiveAPI('live_set').get('is_playing')); } catch (e1) {}
     try { cst = String(new LiveAPI('live_set').get('current_song_time')); } catch (e2) {}
     var extAge = CLOCK.lastExtSyncMs ? (nowMs() - CLOCK.lastExtSyncMs) : -1;
-    var probe = 'clock probe: is_playing=' + ip + ' song_time=' + cst +
+    var probe = 'clock probe [' + BUILD + ']: is_playing=' + ip + ' song_time=' + cst +
       ' nowBeats=' + S.nowBeats +
       ' extSync=' + (extAge < 0 ? 'never' : Math.round(extAge) + 'ms ago') +
       ' clockTask=' + (CLOCK.task ? 'on' : 'OFF') +
