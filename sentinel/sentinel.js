@@ -22,7 +22,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-12c trust-gate';
+var BUILD = '2026-06-12d transport-poll';
 (function () {
   var loc = '';
   try {
@@ -270,6 +270,18 @@ function tick() {
 
   // 2) loop census every 2 s
   if (tickCount % 20 === 0) census();
+
+  // 2b) transport reconcile (perf machine 2026-06-12): the live_set is_playing
+  // observer can silently never fire on some machines — FROZEN then sticks and
+  // the control law never re-arms. Poll the same READ at 2 Hz and synthesize
+  // the missed callback. Same philosophy as the clock trust gate.
+  if (tickCount % 5 === 0) {
+    var tPlay = Resolver.readIsPlaying() === 1;
+    if (S.frozen !== !tPlay) {
+      dbg('transport ' + (tPlay ? 'started' : 'stopped') + ' seen via poll — observer missed it');
+      onIsPlaying(['is_playing', tPlay ? 1 : 0]);
+    }
+  }
 
   // 3) control law (frozen on transport stop — trims hold, nothing moves)
   if (!S.frozen && !JAIL.disabled) controlLaw(mainMeter);

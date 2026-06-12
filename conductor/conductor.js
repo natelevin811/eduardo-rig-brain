@@ -20,7 +20,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-12c trust-gate';
+var BUILD = '2026-06-12d transport-poll';
 (function () {
   var loc = '';
   try {
@@ -537,6 +537,19 @@ function startClock() {
 
 function clockTick() {
   jailRun('clock', function () {
+    // transport reconcile (perf machine 2026-06-12): the live_set is_playing
+    // observer can silently never fire on some machines — stop-release and
+    // ALIVE suspension would then never trigger. Poll the same READ at ~2 Hz
+    // and synthesize the missed callback. Same philosophy as the trust gate.
+    CLOCK.playPolls = (CLOCK.playPolls || 0) + 1;
+    if (CLOCK.playPolls >= 15) {
+      CLOCK.playPolls = 0;
+      var p = Resolver.readIsPlaying() === 1;
+      if (p !== S.isPlaying) {
+        dbg('transport ' + (p ? 'started' : 'stopped') + ' seen via poll — observer missed it');
+        onIsPlaying(['is_playing', p ? 1 : 0]);
+      }
+    }
     if (nowMs() - CLOCK.lastExtSyncMs < 500) return; // plugsync~ chain alive — defer
     if (!REG.liveSet) return;
     var b = parseFloat(REG.liveSet.get('current_song_time'));
