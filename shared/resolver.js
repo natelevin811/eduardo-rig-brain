@@ -269,6 +269,7 @@ var Resolver = (function () {
     beatsPerBar: beatsPerBar,
     getMissing: getMissing,
     clearMissing: clearMissing,
-    setOnMissing: setOnMissing
+    setOnMissing: setOnMissing,
+    noteMissing: noteMissing
   };
 })();

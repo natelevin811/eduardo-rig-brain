@@ -1,4 +1,45 @@
-# STATUS.md — build status, 2026-06-11 overnight session
+# STATUS.md — build status (updated 2026-06-12, post first-rig-test fixes)
+
+## First rig test (2026-06-12) — what broke, what's fixed
+
+Live test on the gig laptop surfaced four real failures; all fixed, reviewed
+(second-model adversarial pass: verdict SHIP), gates clean:
+
+1. **DJ filter domain inverted (show-killer).** The real "Control" param is raw
+   0..1 with CENTER = 0.5 (display −100%..+100%); code modeled −1..1/center 0.
+   RITUAL + CLEAN SLATE slammed all six filters to −100%; sentries rejected the
+   true center so BREATH/FOCUS could never run. Fixed in setmap law (+ moves
+   TUNING re-expressed: breath −62%, focus −60% display; sentry [0.35,0.65]).
+2. **Conductor's beat clock dead (show-killer).** plugsync~ chain delivered no
+   sync on the rig: moves armed (visible on dashboard) but bar stayed 0 — no
+   ramp ever drove. BOTH brains now self-clock by polling live_set
+   current_song_time (READ-only — Link-safe; writes to it are refused by
+   FORBIDDEN_PROPS): conductor 33 ms Task, sentinel inside its 10 Hz tick. Real
+   plugsync~ sync wins when present; fallback stands down.
+3. **Load-race unresolved names.** SENTRIM/HELIX Gain params invisible during
+   set build at device-load. Both brains retry resolution 3× (4 s apart),
+   observers/auto-RITUAL once-guarded, grabs released before each retry pass.
+4. **RISE / ShephardsTone reworked (rig directive).** Now fires the first
+   letter clip (G/C/F/Ab/C#/F#) and swells the unnamed rack's "Output" macro
+   (resolved BY CLASS — rack has no name), ducks 2 bars, stops the clip after
+   the duck. Track volume no longer touched. CLEAN SLATE returns the knob to
+   its at-load position.
+
+Plus: device faces now open in presentation mode (~480 px tidy face — was the
+full 3600 px patching canvas); CONDUCTOR face has a **TEST** button → `grabtest`
+probe (wiggles PadsBus send B for 1.5 s with console posts) to isolate
+live.remote~ pool failures from engine failures.
+
+**On-rig steps after pulling:** replace BOTH devices with the new iCloud .amxd
+(pattr state resets — re-set mode), launch WASH 16 with transport running: bars
+must advance now (fallback clock). If dashboard ramps but knobs still don't
+move, press TEST and read the Max console. Known-accepted: tempo flag (setmap
+says opening 94, set is at 81 — flag-only), stale-heartbeat banner when
+transport is stopped.
+
+---
+
+# Original build log — 2026-06-11 overnight session
 
 ## Phase 1 — resolver + skeletons ✅
 **Done:** `shared/resolver.js` (name-based resolution, recursive rack-chain

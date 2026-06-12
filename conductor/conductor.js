@@ -2,7 +2,8 @@
 //
 // Shell wiring (docs/SHELL-BUILD.md):
 //   inlet 0  : messages — init, sync <beats>, alive 0/1, dryrun 0/1,
-//              mode REHEARSE|SHOW, abort, panic-from-freebang
+//              mode REHEARSE|SHOW, abort, grabtest (grab-pool probe),
+//              panic-from-freebang
 //   outlet 0 : grab pool — [slot 'id' paramId] binds, [slot 'val' f] drives,
 //              [slot 'id' 0] releases. Patch routes to 24 live.remote~ objects.
 //   outlet 1 : telemetry JSON strings → [s rigbrain-telemetry] → sentinel's node.script
@@ -44,7 +45,9 @@ var S = {
   commandClipSlot: -1,   // session slot of the clip that issued the current command
 
   slots: [],             // grab pool: slots[i] = paramId or 0
-  alive: { targets: [], suspended: false }
+  alive: { targets: [], suspended: false },
+  shepRest: null,        // ShephardsTone Output macro value at load (CLEAN SLATE target)
+  initRetries: 0         // load-race resolution retries (see end of _init)
 };
 
 var REG = {};            // resolved LOM registry, built in init()
@@ -129,6 +132,9 @@ function _init() {
   S.setmap = Resolver.loadSetmap(SETMAP_FILE);
   if (!S.setmap) { reportResolution(); return; }
 
+  // retry passes re-run _init: release any held grabs BEFORE zeroing the slot
+  // table, or orphaned live.remote~ bindings lock params away from hands.
+  releaseAllGrabs();
   for (var i = 0; i < NUM_REMOTES; i++) S.slots[i] = 0;
   S.beatsPerBar = Resolver.beatsPerBar();
 
@@ -196,28 +202,52 @@ function _init() {
     REG.riserSlot = firstFilledSlot(wt);
     if (!REG.riserSlot) Telemetry.alert('resolve', 'WhiteNoise: no filled clip slot found');
   }
-  var shep = S.setmap.risers[1]; // ShephardsTone — track volume swell
+  var shep = S.setmap.risers[1]; // ShephardsTone — rack macro "Output" + letter clip
   var st = Resolver.track(shep.name);
   if (st) {
-    var svp = Resolver.trackVolume(st);
-    if (svp) {
-      REG.trackvol = REG.trackvol || {};
-      REG.trackvol[shep.name] = Resolver.paramInfo(svp);
+    // rig directive 2026-06-12: drive the rack's "Output" macro, NOT the track
+    // volume. The rack is UNNAMED in the set — resolve by class, not name.
+    var stPath = st.unquotedpath || st.path.replace(/"/g, '');
+    var snd = parseInt(st.getcount('devices'), 10) || 0;
+    var srack = null;
+    for (var sdi = 0; sdi < snd; sdi++) {
+      var scand = new LiveAPI(stPath + ' devices ' + sdi);
+      if (String(scand.get('class_name')) === 'InstrumentGroupDevice') { srack = scand; break; }
     }
+    var smName = (shep.macro && shep.macro.name) ? shep.macro.name : 'Output';
+    if (!srack) {
+      // must be VISIBLE to the missing list or the load-race retry never fires
+      Resolver.noteMissing('device', shep.name + ' / InstrumentGroupDevice',
+        'no instrument rack found by class (load race? retry will re-scan)');
+    }
+    var smp = Resolver.param(srack, smName, shep.name + ' rack');
+    if (smp) {
+      REG.shepmacro = Resolver.paramInfo(smp);
+      // rest = wherever hands left the knob at load; CLEAN SLATE returns here
+      S.shepRest = parseFloat(smp.get('value'));
+    }
+    REG.shepSlot = firstFilledSlot(st); // first letter clip (G/C/F/Ab/C#/F#)
+    if (!REG.shepSlot) Telemetry.alert('resolve', shep.name + ': no filled clip slot found');
   }
 
   // --- CONDUCTOR command track ------------------------------------------------
+  // observers created once and guarded: a resolution RETRY re-runs _init and a
+  // second observer on the same property would double-fire every command.
   var ct = Resolver.track('CONDUCTOR');
   if (ct) {
     REG.conductorTrack = ct;
     REG.conductorTrackPath = ct.unquotedpath || ct.path.replace(/"/g, '');
-    REG.cmdObserver = new LiveAPI(onPlayingSlot, REG.conductorTrackPath);
-    REG.cmdObserver.property = 'playing_slot_index';
+    if (!REG.cmdObserver) {
+      REG.cmdObserver = new LiveAPI(onPlayingSlot, REG.conductorTrackPath);
+      REG.cmdObserver.property = 'playing_slot_index';
+    }
   }
 
   // --- transport observer (read-only: we listen, we never speak) ---------------
-  REG.playObserver = new LiveAPI(onIsPlaying, 'live_set');
-  REG.playObserver.property = 'is_playing';
+  if (!REG.playObserver) {
+    REG.playObserver = new LiveAPI(onIsPlaying, 'live_set');
+    REG.playObserver.property = 'is_playing';
+  }
 
   // --- ALIVE targets: send B + C on Pads + Leads --------------------------------
   S.alive.targets = [];
@@ -233,8 +263,20 @@ function _init() {
   }
 
   S.ready = true;
+  startClock(); // fallback beat clock — see CLOCK above
   reportResolution();
   Telemetry.emit('boot', { sub: 'conductor', missing: Resolver.getMissing().length, mode: S.mode });
+
+  // load race: M4L devices init while Live is still building the set, so some
+  // names can be invisible on the first pass (seen on the rig 2026-06-12:
+  // SENTRIM/HELIX params unresolved at load, fine minutes later). Retry a few
+  // times; red text stays if it's genuinely missing.
+  if (Resolver.getMissing().length > 0 && S.initRetries < 3) {
+    S.initRetries++;
+    REG.retryTask = new Task(function () { jailRun('init-retry', _init); }, this);
+    REG.retryTask.schedule(4000);
+    dbg('unresolved names — retrying resolution in 4s (attempt ' + S.initRetries + '/3)');
+  }
 }
 
 function firstFilledSlot(trackApi) {
@@ -337,6 +379,7 @@ function resolveTarget(t) {
   if (t.kind === 'clvol')     return REG.clvol[t.lane] || null;
   if (t.kind === 'trackvol')  return (REG.trackvol || {})[t.track] || null;
   if (t.kind === 'risermacro') return REG.risermacro || null;
+  if (t.kind === 'shepmacro')  return REG.shepmacro || null;
   return null;
 }
 
@@ -347,6 +390,7 @@ function targetLabel(t) {
   if (t.kind === 'clvol')    return t.lane;
   if (t.kind === 'trackvol') return t.track + '/vol';
   if (t.kind === 'risermacro') return 'KnobRiser';
+  if (t.kind === 'shepmacro')  return 'ShepOutput';
   return '?';
 }
 
@@ -355,7 +399,7 @@ function sentryPass(kind, capturedRaw, info) {
   var w = TUNING.sentry[kind];
   if (!w) return true;
   var v = capturedRaw;
-  if (kind === 'macro' || kind === 'risermacro') {
+  if (kind === 'macro' || kind === 'risermacro' || kind === 'shepmacro') {
     v = (info.max > info.min) ? (capturedRaw - info.min) / (info.max - info.min) : 0;
   }
   return v >= w[0] && v <= w[1];
@@ -460,10 +504,38 @@ function laneValueAt(lane, bars) {
   return segs[segs.length - 1].to;
 }
 
-// sync <beats> — the engine clock, ~30 Hz from plugsync~ via snapshot~.
+// sync <beats> — the engine clock, ~30 Hz from the shell's plugsync~ chain.
 // Bar timing derives from beat position continuously: a Link tempo jump mid-move
 // bends the ramp (beats stretch), never breaks it. (Safeguard #4.)
-function sync(beats) { jailRun('sync', _sync, [beats]); }
+//
+// FALLBACK CLOCK (rig 2026-06-12): on the rig the plugsync~ chain produced no
+// sync at all — moves armed, telemetry announced them, bar position never
+// advanced, nothing was ever driven. The brain now self-clocks: a 33 ms Task
+// polls live_set current_song_time (in BEATS). This is a READ — Link-safe;
+// writing it is refused by the resolver's FORBIDDEN_PROPS. If real plugsync~
+// sync messages arrive, they win and the fallback stands down.
+var CLOCK = { task: null, lastExtSyncMs: 0 };
+
+function startClock() {
+  if (CLOCK.task) return;
+  CLOCK.task = new Task(clockTick, this);
+  CLOCK.task.interval = 33;
+  CLOCK.task.repeat();
+}
+
+function clockTick() {
+  jailRun('clock', function () {
+    if (nowMs() - CLOCK.lastExtSyncMs < 500) return; // plugsync~ chain alive — defer
+    if (!REG.liveSet) return;
+    var b = parseFloat(REG.liveSet.get('current_song_time'));
+    if (!isNaN(b)) _sync(b);
+  });
+}
+
+function sync(beats) {
+  CLOCK.lastExtSyncMs = nowMs();
+  jailRun('sync', _sync, [beats]);
+}
 
 function _sync(beats) {
   S.nowBeats = beats;
@@ -528,6 +600,8 @@ function _sync(beats) {
 function runEvent(action) {
   if (action === 'fireRiser' && REG.riserSlot && !S.dryRun) Resolver.call(REG.riserSlot, 'fire');
   if (action === 'killRiser' && REG.riserSlot && !S.dryRun) Resolver.call(REG.riserSlot, 'stop');
+  if (action === 'fireShep' && REG.shepSlot && !S.dryRun) Resolver.call(REG.shepSlot, 'fire');
+  if (action === 'killShep' && REG.shepSlot && !S.dryRun) Resolver.call(REG.shepSlot, 'stop');
   Telemetry.emit('event', { action: action, dry: S.dryRun ? 1 : 0 });
 }
 
@@ -548,8 +622,11 @@ function runCleanSlate() {
   for (name in REG.clvol) {
     if (REG.clvol.hasOwnProperty(name)) setParamRaw(REG.clvol[name], TUNING.clZeroDb);
   }
+  // center detent comes from setmap LAW: raw 0..1, center 0.5 (RIG-VERIFIED
+  // 2026-06-12 — the old hardcoded 0.0 slammed every dial to -100% / LP closed)
+  var djCenter = S.setmap.dj_filter_param.center_detent;
   for (name in REG.djfilter) {
-    if (REG.djfilter.hasOwnProperty(name)) setParamRaw(REG.djfilter[name], 0.0); // center detent
+    if (REG.djfilter.hasOwnProperty(name)) setParamRaw(REG.djfilter[name], djCenter);
   }
   for (name in REG.macro) {
     if (REG.macro.hasOwnProperty(name)) {
@@ -559,8 +636,9 @@ function runCleanSlate() {
   }
   if (REG.riserSlot) Resolver.call(REG.riserSlot, 'stop');
   if (REG.risermacro) setParamRaw(REG.risermacro, REG.risermacro.min);
-  if (REG.trackvol && REG.trackvol['42-ShephardsTone']) {
-    setParamRaw(REG.trackvol['42-ShephardsTone'], 0.949); // setmap rest: -0.45 dB
+  if (REG.shepSlot) Resolver.call(REG.shepSlot, 'stop');
+  if (REG.shepmacro && S.shepRest !== null) {
+    setParamRaw(REG.shepmacro, S.shepRest); // Output macro back where hands left it
   }
   Telemetry.emit('move', { phase: 'cleanslate' });
   dbg('CLEAN SLATE executed');
@@ -668,6 +746,44 @@ function mode(m) {
     Telemetry.setMode(m);
     uiOut('mode', m);
     Telemetry.emit('mode', { mode: m });
+  });
+}
+
+// GRABTEST — grab-pool probe for "dashboard shows the move but Live doesn't
+// move" (rig 2026-06-12). Direct API writes (CLEAN SLATE) worked on the rig,
+// so the suspect is the live.remote~ path: js outlet 0 → route → live.remote~.
+// Sends one real grab/drive/release cycle on PadsBus send B with posts at every
+// step. Watch the Max console AND the send knob. REHEARSE-tool; honors dry-run.
+var GRABTEST = { task: null, info: null, captured: 0, slot: -1 };
+
+function grabtest() {
+  jailRun('grabtest', function () {
+    if (!S.ready) { dbg('grabtest: not ready (init failed?)'); return; }
+    if (S.dryRun) { dbg('grabtest: DRY-RUN is ON — toggle it off to test real writes'); return; }
+    if (GRABTEST.slot >= 0) { dbg('grabtest: already running — wait for it to finish'); return; }
+    var info = (REG.send['PadsBus'] || [])[1]; // send B
+    if (!info) { dbg('grabtest: PadsBus send B unresolved'); return; }
+    GRABTEST.info = info;
+    GRABTEST.captured = parseFloat(Resolver.byId(info.id).get('value'));
+    GRABTEST.slot = slotAcquire(info.id);
+    dbg('grabtest: target PadsBus/sndB id=' + info.id + ' captured=' + GRABTEST.captured);
+    dbg('grabtest: acquired slot ' + GRABTEST.slot + ' — sent [' + GRABTEST.slot + ' id ' + info.id + '] out outlet 0');
+    if (GRABTEST.slot < 0) return;
+    var bump = Math.min(info.max, GRABTEST.captured + 0.10 * (info.max - info.min));
+    slotDrive(GRABTEST.slot, bump);
+    dbg('grabtest: drove value ' + bump + ' — the PadsBus send B knob should be moving NOW');
+    Telemetry.alert('grabtest', 'driving PadsBus/sndB to ' + bump + ' via slot ' + GRABTEST.slot);
+    GRABTEST.task = new Task(function () {
+      jailRun('grabtest-end', function () {
+        slotDrive(GRABTEST.slot, GRABTEST.captured);
+        slotRelease(GRABTEST.slot);
+        dbg('grabtest: restored ' + GRABTEST.captured + ' and released slot ' + GRABTEST.slot);
+        dbg('grabtest: if the knob NEVER moved, the live.remote~ pool is the break — check patch cords/inlets');
+        Telemetry.alert('grabtest', 'done — knob moved = pool OK; knob still = pool broken');
+        GRABTEST.slot = -1; // re-arm for the next press
+      });
+    }, this);
+    GRABTEST.task.schedule(1500);
   });
 }
 

@@ -191,6 +191,17 @@ function addGrabPool(B, js, slots, x, y) {
 }
 
 // UI face-out: js outlet2 -> [route ui] -> [route <keys>] -> display objects.
+// Status displays get presentation rects (second face row y=44, missing line
+// y=64). alive/dryrun numboxes stay patching-only — redundant with the toggles.
+const UI_PRES = {
+  unresolved: [4, 44, 44, 16],
+  errors: [94, 44, 44, 16],
+  mode: [180, 44, 90, 15],
+  disabled: [274, 44, 200, 15],
+  missing: [4, 64, 470, 15],
+};
+const UI_CAPTIONS = { unresolved: ['unres', [50, 44, 40, 15]], errors: ['errs', [140, 44, 36, 15]] };
+
 function addUiOut(B, js, x, y) {
   B.comment('STATUS OUT — js outlet 2 drives the device face (red-text styling is taste; set in inspector).', x, y - 22, 520);
   const routeUi = B.obj('route ui', x, y, 1, 2);
@@ -203,14 +214,22 @@ function addUiOut(B, js, x, y) {
   keys.forEach((k, i) => {
     const cx = x + i * 120;
     const cy = y + 90;
+    const pres = UI_PRES[k] ? { presentation: 1, presentation_rect: UI_PRES[k] } : {};
     if (k === 'unresolved' || k === 'errors' || k === 'alive' || k === 'dryrun') {
-      const nb = B.box('live.numbox', null, cx, cy, 1, 2, { varname: 'ui_' + k });
+      const nb = B.box('live.numbox', null, cx, cy, 1, 2, { varname: 'ui_' + k, ...pres });
       B.connect(routeKeys, i, nb, 0);
       disp[k] = nb;
+      if (UI_CAPTIONS[k]) {
+        const [label, rect] = UI_CAPTIONS[k];
+        B.box('live.comment', label, cx + 50, cy, 1, 0, {
+          presentation: 1,
+          presentation_rect: rect,
+        });
+      }
     } else {
       // missing / mode / disabled -> text display via [prepend set] -> live.comment
       const pre = B.obj('prepend set', cx, cy, 1, 1);
-      const cm = B.box('live.comment', k.toUpperCase(), cx, cy + 36, 1, 0, { varname: 'ui_' + k });
+      const cm = B.box('live.comment', k.toUpperCase(), cx, cy + 36, 1, 0, { varname: 'ui_' + k, ...pres });
       B.connect(routeKeys, i, pre, 0);
       B.connect(pre, 0, cm, 0);
       disp[k] = cm;
@@ -223,15 +242,20 @@ function addUiOut(B, js, x, y) {
 // spec: [{kind:'toggle'|'button'|'tab', label, message, tabs?}]
 function addFaceControls(B, js, controls, x, y) {
   B.comment('FACE CONTROLS — performer hands -> js inlet.', x, y - 22, 360);
+  let presX = 4; // presentation row: y=20, 18 tall, 4px gaps; tabs need 110
   controls.forEach((c, i) => {
     const cx = x + i * 150;
     const cy = y;
+    const presW = c.kind === 'tab' ? 110 : 70;
+    const pres = { presentation: 1, presentation_rect: [presX, 20, presW, 18] };
+    presX += presW + 4;
     if (c.kind === 'tab') {
       // live.tab -> sel 0 1 -> [mode A( / [mode B(
       const tab = B.box('live.tab', null, cx, cy, 1, 3, {
         varname: c.varname || 'ctl_' + i,
         saved_attribute_attributes: { valueof: { parameter_enum: c.tabs } },
         parameter_enable: 1,
+        ...pres,
       });
       const sel = B.obj('sel 0 1', cx, cy + 40, 2, 3);
       const mA = B.msg(c.message + ' ' + c.tabs[0], cx, cy + 76);
@@ -251,6 +275,7 @@ function addFaceControls(B, js, controls, x, y) {
         text: c.label,
         mode: 0, // Button
         parameter_enable: 1,
+        ...pres,
       });
       const m = B.msg(c.message, cx, cy + 40);
       B.connect(bt, 0, m, 0);
@@ -262,11 +287,21 @@ function addFaceControls(B, js, controls, x, y) {
         text: c.label,
         mode: 1, // Toggle
         parameter_enable: 1,
+        ...pres,
       });
       const m = B.msg(c.message + ' $1', cx, cy + 40);
       B.connect(tg, 0, m, 0);
       B.connect(m, 0, js, 0);
     }
+  });
+}
+
+// Device-face title, top-left of the presentation view.
+function addTitle(B, text, x, y) {
+  B.box('live.comment', text, x, y, 1, 0, {
+    varname: 'ui_title',
+    presentation: 1,
+    presentation_rect: [4, 2, 120, 15],
   });
 }
 
@@ -299,10 +334,12 @@ function buildConductor(patcher) {
       { kind: 'toggle', label: 'DRY-RUN', message: 'dryrun', varname: 'ctl_dryrun' },
       { kind: 'tab', message: 'mode', tabs: ['REHEARSE', 'SHOW'], varname: 'ctl_mode' },
       { kind: 'button', label: 'ABORT', message: 'abort', varname: 'ctl_abort' },
+      { kind: 'button', label: 'TEST', message: 'grabtest', varname: 'ctl_grabtest' },
     ],
     60,
     1050
   );
+  addTitle(B, 'CONDUCTOR', 40, 330);
   addPattr(B, js, 'conductor_state', 700, 470);
 
   // telemetry: js outlet 1 -> send
@@ -334,6 +371,7 @@ function buildSentinel(patcher) {
     60,
     1050
   );
+  addTitle(B, 'SENTINEL', 40, 330);
   addPattr(B, js, 'sentinel_state', 700, 470);
 
   // telemetry: js outlet 1 AND [r rigbrain-telemetry] (conductor's events) -> node.script
@@ -362,6 +400,11 @@ function buildDevice(name, buildFn) {
   const before = patcher.boxes.length;
   const B = buildFn(patcher);
   patcher.rect = [120, 120, 900, 1300]; // roomy editor window
+  // Presentation mode: without it Live renders the whole ~3600px patching
+  // canvas as the device face. Only boxes flagged presentation:1 (face
+  // controls, status displays, title) appear; the plumbing stays hidden.
+  patcher.openinpresentation = 1;
+  patcher.devicewidth = 480.0;
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const out = path.join(OUT_DIR, name + '.amxd');

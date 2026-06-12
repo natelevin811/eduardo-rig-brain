@@ -23,7 +23,7 @@ Exit 0 = clean, 1 = findings.
 import struct, json, glob, sys, os
 
 EXPECT_SLOTS = {"CONDUCTOR": 24, "SENTINEL": 7}
-BUTTONS = {"ABORT", "RITUAL"}  # everything else live.text is a toggle
+BUTTONS = {"ABORT", "RITUAL", "TEST"}  # everything else live.text is a toggle
 
 def real_io(maxclass, text):
     t = text or ""

@@ -128,6 +128,10 @@ function _init() {
 
   S.setmap = Resolver.loadSetmap(SETMAP_FILE);
   if (!S.setmap) { reportResolution(); return; }
+
+  // retry passes re-run _init and rebuild S.buses: release any held grabs
+  // BEFORE the rebuild drops the grabbed flags, or bindings orphan.
+  releaseAllGrabs();
   S.cfg = S.setmap.sentinel_targets;
   S.ceiling = S.cfg.main_peak_ceiling;
   S.beatsPerBar = Resolver.beatsPerBar();
@@ -175,9 +179,13 @@ function _init() {
     });
   }
 
-  REG.playObserver = new LiveAPI(onIsPlaying, 'live_set');
-  REG.playObserver.property = 'is_playing';
+  // guarded: resolution RETRY re-runs _init; a second observer would double-fire
+  if (!REG.playObserver) {
+    REG.playObserver = new LiveAPI(onIsPlaying, 'live_set');
+    REG.playObserver.property = 'is_playing';
+  }
   S.frozen = Resolver.readIsPlaying() !== 1;
+  REG.liveSetClock = new LiveAPI('live_set'); // beat-clock fallback reads current_song_time
 
   if (TASK) TASK.cancel();
   TASK = new Task(tickJail, this);
@@ -192,9 +200,22 @@ function _init() {
   if (S.pendingTrims) { applyTrims(S.pendingTrims); S.pendingTrims = null; }
 
   // RITUAL auto-runs on set load in REHEARSE only; manual-only in SHOW.
-  if (S.mode === 'REHEARSE') {
-    var rt = new Task(function () { jailRun('ritual', _ritual); }, this);
-    rt.schedule(3000);
+  // Once-guarded: resolution retries re-run _init and must not re-fire it.
+  if (S.mode === 'REHEARSE' && !REG.autoRitualScheduled) {
+    REG.autoRitualScheduled = true;
+    REG.ritualTask = new Task(function () { jailRun('ritual', _ritual); }, this);
+    REG.ritualTask.schedule(3000);
+  }
+
+  // load race: M4L devices init while Live is still building the set — names
+  // can be invisible on the first pass (seen on the rig 2026-06-12: SENTRIM and
+  // HELIX Gain params unresolved at load). Retry; red text stays if real.
+  REG.initRetries = REG.initRetries || 0;
+  if (Resolver.getMissing().length > 0 && REG.initRetries < 3) {
+    REG.initRetries++;
+    REG.retryTask = new Task(function () { jailRun('init-retry', _init); }, this);
+    REG.retryTask.schedule(4000);
+    dbg('unresolved names — retrying resolution in 4s (attempt ' + REG.initRetries + '/3)');
   }
 }
 
@@ -219,6 +240,9 @@ function tickJail() { jailRun('tick', tick); }
 function tick() {
   if (!S.ready) return;
   tickCount++;
+
+  // 0) beat clock fallback — see sync() below (rig 2026-06-12)
+  clockFallback();
 
   // 1) meters
   var mainMeter = parseFloat(S.mainApi.get('output_meter_level'));
@@ -423,7 +447,22 @@ function busAvgDb(b, bars) {
 // ---------------------------------------------------------------------------
 // sync + heartbeat
 // ---------------------------------------------------------------------------
-function sync(beats) { jailRun('sync', _sync, [beats]); }
+// FALLBACK CLOCK (rig 2026-06-12): the shell's plugsync~ chain produced no sync
+// on the rig — heartbeats never fired. The 10 Hz tick polls live_set
+// current_song_time (BEATS — a READ; writes to it are refused by the resolver's
+// FORBIDDEN_PROPS) whenever real sync messages go quiet; real plugsync~ wins.
+var CLOCK = { lastExtSyncMs: 0 };
+
+function clockFallback() {
+  if (nowMs() - CLOCK.lastExtSyncMs < 500) return;
+  var b = parseFloat(REG.liveSetClock ? REG.liveSetClock.get('current_song_time') : NaN);
+  if (!isNaN(b)) _sync(b);
+}
+
+function sync(beats) {
+  CLOCK.lastExtSyncMs = nowMs();
+  jailRun('sync', _sync, [beats]);
+}
 
 function _sync(beats) {
   S.nowBeats = beats;

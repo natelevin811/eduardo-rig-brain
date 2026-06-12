@@ -26,10 +26,12 @@
 // confirm them in the room.
 // ---------------------------------------------------------------------------
 var TUNING = {
-  // DJ Filter Soft Clip "DJ Control": raw -1..1, center 0.
-  // Setmap polarity: negative = LP closes (VERIFY in calibration, fix here + setmap).
-  djLpBreath:   -0.62,   // VERIFY by ear: the "underwater inhale" depth
-  djLpFocus:    -0.60,   // FOCUS: non-spotlit buses ease 60% low-passed
+  // DJ Filter Soft Clip "Control": raw 0..1, CENTER = 0.5. RIG-VERIFIED
+  // 2026-06-12: display% = (raw - 0.5) * 200, so raw 0.0 == -100% == LP
+  // slammed shut (exactly what the old -1..1 model did via RITUAL and CLEAN
+  // SLATE). LP territory is BELOW 0.5, HP above.
+  djLpBreath:    0.19,   // display -62%. VERIFY by ear: the "underwater inhale" depth
+  djLpFocus:     0.20,   // display -60%. FOCUS: non-spotlit buses ease low-passed
 
   // Master FX macros, normalized 0..1 of the macro range. Rest is 0 per setmap.
   lpfDrift:      0.15,   // HORIZON: 15% closed
@@ -50,7 +52,10 @@ var TUNING = {
 
   // CL lane + riser levels, raw mixer values (0.85 = 0 dB, 0.0 = -inf).
   clZeroDb:      0.85,
-  shepSwell:     0.999,  // RISE: ShephardsTone swell-to (rest 0.949 = -0.45 dB)
+  shepSwellAbs:  1.0,    // RISE: ShephardsTone rack macro "Output" swell-to,
+                         // normalized 0..1 of the macro range (VERIFY by ear).
+                         // Rig directive 2026-06-12: drive the Output macro,
+                         // NOT the Ableton track volume.
 
   // ALIVE drift (conductor.js): hard bounds, normalized units around baseline.
   aliveBound:    0.015,  // +/-1.5%, setmap-law, do not raise
@@ -60,12 +65,13 @@ var TUNING = {
   // Range sentries: captured value must sit inside these RAW windows or the
   // lane is skipped (someone else owns that param right now).
   sentry: {
-    djfilter: [-0.30, 0.30],   // near center detent
+    djfilter: [0.35, 0.65],    // raw 0..1 domain: within +/-30% display of the 0.5 center
     macro:    [0.0, 0.45],     // normalized; macros live near rest between moves
     send:     [0.0, 0.92],
     clvol:    [0.0, 1.0],      // CL faders are conductor-owned; any value is ours
     trackvol: [0.4, 1.0],
-    risermacro: [0.0, 0.10]
+    risermacro: [0.0, 0.10],
+    shepmacro:  [0.0, 1.0]     // Output macro rest is wherever hands left it — always ours during RISE
   }
 };
 
@@ -146,14 +152,19 @@ var MOVES = {
   }},
 
   'RISE': { defaultBars: 16, build: function (n, arg, T) {
+    // WhiteNoise riser clip + KnobRiser macro, AND ShephardsTone: fire one of
+    // its letter clips and swell the rack's "Output" macro (NOT track volume —
+    // rig directive 2026-06-12), duck back over the last 2 bars, stop the clip.
     return { bars: n + 2, lanes: [
       { target: { kind: 'risermacro' }, sentry: 'risermacro',
         segments: [ramp(n, { abs: 1.0 }), snap({ abs: 0.0 }), hold(2)] },
-      { target: { kind: 'trackvol', track: '42-ShephardsTone' }, sentry: 'trackvol',
-        segments: [ramp(n, { raw: T.shepSwell }), restore(2)] }
+      { target: { kind: 'shepmacro' }, sentry: 'shepmacro',
+        segments: [ramp(n, { abs: T.shepSwellAbs }), restore(2)] }
     ], events: [
       { atBars: 0, action: 'fireRiser' },
-      { atBars: n, action: 'killRiser' }
+      { atBars: 0, action: 'fireShep' },
+      { atBars: n, action: 'killRiser' },
+      { atBars: n + 2, action: 'killShep' } // stop AFTER the 2-bar duck, not at peak swell
     ]};
   }},
 

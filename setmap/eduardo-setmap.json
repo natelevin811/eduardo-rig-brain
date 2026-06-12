@@ -22,9 +22,9 @@
   "dj_filter_param": {
     "device_name": "DJ Filter Soft Clip",
     "param_name_candidates": ["Control", "DJ Control", "DjControl"],
-    "center_detent": 0.0,
-    "range": [-1.0, 1.0],
-    "polarity": "negative = low-pass closes, positive = high-pass rises (VERIFY in calibration pass and correct here)"
+    "center_detent": 0.5,
+    "range": [0.0, 1.0],
+    "polarity": "RIG-VERIFIED 2026-06-12: raw param is 0..1, CENTER = 0.5 (dial shows 0%). Display% = (raw - 0.5) * 200. Writing 0.0 slams the dial to -100% (LP fully closed) — this was the v1 bug: code modeled raw -1..1/center 0 and RITUAL + CLEAN SLATE closed every filter. Below 0.5 = LP closes, above 0.5 = HP rises."
   },
 
   "master_fx": {
@@ -46,7 +46,7 @@
 
   "risers": [
     { "name": "WhiteNoise", "lom_hint": 40, "instrument_rack": "KnobRiser", "macro": { "index": 0, "name": "Riser", "rest": 0.0 }, "clips": "16 identical 'P-LASK Noise Generator' MIDI clips in session", "use": "fire any clip + ramp macro; kill clip and zero macro at move end" },
-    { "name": "42-ShephardsTone", "lom_hint": 41, "instrument_rack": "(unnamed InstrumentGroupDevice)", "control": "track volume swell (current 0.949 lin = -0.45 dB rest)", "use": "infinite-rise illusion for long builds; swell in over n bars, out over n/2" }
+    { "name": "42-ShephardsTone", "lom_hint": 41, "instrument_rack": "(unnamed InstrumentGroupDevice — resolve by class, not name)", "macro": { "name": "Output", "rest": "captured at device load" }, "control": "RIG-DIRECTIVE 2026-06-12: fire one of the letter-named clips (G/C/F/Ab/C#/F# — first filled slot) AND swell the rack's first macro knob 'Output'. NOT the Ableton track volume (old v1 behavior).", "use": "infinite-rise illusion for long builds; swell in over n bars, duck over 2 at end, stop clip" }
   ],
 
   "returns_send_index": [
