@@ -517,8 +517,13 @@ function _ritual() {
   }
 
   fix('capture tracks Monitor In', function () {
-    var caps = Resolver.tracksMatching('Cptr').concat(Resolver.tracksMatching('REC FEED'));
-    if (!caps.length) throw new Error('no Cptr / REC FEED tracks found');
+    // Cptr* audio/midi tracks, *REC FEED groups, and the HELIX CAPTURE IN track
+    // all need Monitor = In pre-show. HELIX CAPTURE IN matches neither Cptr nor
+    // REC FEED, so it is listed explicitly (confirmed against the gig set).
+    var caps = Resolver.tracksMatching('Cptr')
+      .concat(Resolver.tracksMatching('REC FEED'))
+      .concat(Resolver.tracksMatching('HELIX CAPTURE'));
+    if (!caps.length) throw new Error('no Cptr / REC FEED / HELIX CAPTURE tracks found');
     for (var k = 0; k < caps.length; k++) Resolver.set(caps[k], 'current_monitoring_state', 0); // In
   });
 

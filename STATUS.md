@@ -94,12 +94,14 @@ are now parked and applied after resolve).
   `Gain` params display in dB in the device UI, so Utility Gain is dB-native.
   SENTRIM is the same Utility device type → dB-native, no `writeTrim` remap
   needed. C8 step 2 remains a formality (confirm min ≈ −35); no mapping expected.
+- **Q3: capture tracks** — ✅ RESOLVED against the gig set. Tracks
+  `CptrPercAudio/Midi`, `CptrBssAudio/Midi`, `CptrPdAudio`, `CptrLdAudio`
+  (match `Cptr`) and groups `PERC/BASS/PAD/LEAD REC FEED` (match `REC FEED`).
+  `HELIX CAPTURE IN` also needs Monitor=In but matches neither, so `HELIX
+  CAPTURE` was added as a third substring to the RITUAL Monitor-In fix.
 
 ### Still open
 
-- **Q3: capture tracks** — RITUAL's Monitor-In fix pattern-matches track names
-  containing `Cptr` / `REC FEED`. Verify those substrings match the real track
-  names (quick check with the set open).
 - **Q5: plugsync~ outlet scaling** — beats vs ticks differs by Max version;
   needs the device running in Max (C0). Worst case: one `[/ 480.]` per shell.
 - **Q6: BLOOM/SUNRISE send return-shape** — current build returns sends to
