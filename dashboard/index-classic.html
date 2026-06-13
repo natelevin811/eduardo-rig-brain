@@ -128,6 +128,8 @@
   <span class="flag" id="arcFlag">NIGHT ARC</span>
   <span class="flag" id="frozenFlag">FROZEN</span>
   <div id="modeBadge" class="rehearse">REHEARSE</div>
+  <a id="toNew" href="/" title="Back to the new dashboard ( press \ )"
+     style="margin-left:auto;font:inherit;font-size:11px;letter-spacing:.06em;color:var(--dim);text-decoration:none;border:1px solid var(--dim);border-radius:6px;padding:3px 9px">&rarr; New UI <span style="opacity:.6">\</span></a>
 </div>
 
 <div id="mid">
@@ -153,6 +155,11 @@
 </div>
 
 <script>
+// backslash toggles back to the new UI (same key that brought you here), so the
+// classic view is never a one-way trap (rig 2026-06-13: "cant get out of old UI")
+document.addEventListener('keydown', function (e) {
+  if (e.key === '\\' && !e.metaKey && !e.ctrlKey && !e.altKey) { location.href = '/'; }
+});
 const BUSES = ['LoDrumsBus','HiDrumsBus','PercBus','BassBus','PadsBus','LeadsBus'];
 const SHORT = { LoDrumsBus:'LO DRM', HiDrumsBus:'HI DRM', PercBus:'PERC',
                 BassBus:'BASS', PadsBus:'PADS', LeadsBus:'LEADS' };

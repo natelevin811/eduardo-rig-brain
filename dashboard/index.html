@@ -80,6 +80,13 @@
   #link { font-size:10px; letter-spacing:.08em; color:var(--dim); display:flex; align-items:center; gap:5px; }
   #link::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--green); }
   #link.down::before { background:var(--red); } #link.down { color:var(--red); }
+  /* SHOW mode = nothing to fiddle with. Hide the log/layout chrome and the
+     alerts scrollback so the screen is just the performance state. The critical
+     channel (stale-heartbeat / link-down) stays — it's the top banner, not these.
+     Stage + Classic stay reachable (performance + the safety escape hatch). */
+  body.showmode #btnLog, body.showmode #btnCopy,
+  body.showmode #btnEdit, body.showmode #btnReset,
+  body.showmode #p-alerts { display:none !important; }
 
   #grid { display:grid; grid-template-columns:repeat(12,1fr); gap:var(--gap); grid-auto-rows:var(--row);
           grid-auto-flow:row dense; flex:1; min-height:0; align-content:start; }
@@ -114,7 +121,9 @@
               text-overflow:ellipsis; transition:color .3s; }
   #moveName.idle { color:var(--dim); font-weight:500; font-size:clamp(22px,3vw,32px); }
   #moveName.dry::after { content:" · DRY"; color:var(--amber-d); font-size:.4em; vertical-align:.4em; letter-spacing:.1em; }
-  #progPctTop { margin-left:auto; font-family:var(--disp); font-weight:700; font-size:22px; color:var(--txt2); }
+  #progPctTop { margin-left:auto; font-family:var(--disp); font-weight:700; font-size:28px; color:var(--txt); }
+  #progPctTop .barlbl { font-family:inherit; font-weight:500; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-right:7px; vertical-align:middle; }
+  #progPctTop .ofN { color:var(--dim); font-weight:500; }
   #moveDesc { font-size:12px; color:var(--txt2); line-height:1.4; min-height:1.4em; }
   #loopWrap { flex:1; min-height:64px; position:relative; }
   #loopCanvas { width:100%; height:100%; display:block; cursor:ew-resize; }
@@ -659,6 +668,7 @@ function paint(){
   $('fAlive').classList.toggle('on',state.flags.alive); $('fDry').classList.toggle('on',state.flags.dry);
   $('fArc').classList.toggle('on',state.flags.nightArc); $('fFrozen').classList.toggle('on',state.flags.frozen);
   const m=$('mode'); m.textContent=state.mode; m.className=state.mode==='SHOW'?'show':'rehearse';
+  document.body.classList.toggle('showmode',state.mode==='SHOW'); // auto-declutter in SHOW
 
   const banner=$('banner');
   if(state.link.failed){ banner.textContent='TELEMETRY LINK DOWN — devices unaffected, reconnecting…'; banner.className='show warn'; }
@@ -668,11 +678,15 @@ function paint(){
 
   const mv=state.move, pct=mv.of>0?Math.min(100,(mv.bars/mv.of)*100):0;
   const nameEl=$('moveName'); nameEl.textContent=mv.name; nameEl.classList.toggle('idle',!mv.active); nameEl.classList.toggle('dry',mv.dry);
-  $('progPctTop').textContent=mv.active&&mv.of>0?Math.round(pct)+'%':'—';
+  // bar number, not percentage — a musician counts bars, so 1-indexed "bar 3/8"
+  // is what reads across the room (rig 2026-06-13 ask). mv.bars is 0-indexed
+  // elapsed, so the bar we're IN is bars+1, clamped to the total.
+  const barNow=Math.min(mv.of,mv.bars+1);
+  $('progPctTop').innerHTML=mv.active&&mv.of>0?`<span class="barlbl">bar</span>${barNow}<span class="ofN">/${mv.of}</span>`:'—';
   $('moveDesc').textContent=mv.active?moveDesc(mv.name):'';
   const hb=$('holdBadge');
   if(state.hold.active){ hb.classList.add('show'); hb.textContent='HELD · bar '+state.hold.bar.toFixed(1); } else hb.classList.remove('show');
-  $('nowNext').innerHTML=mv.active&&mv.of>0?`bar <b>${mv.bars} / ${mv.of}</b>${nextEventText()?' · next '+nextEventText():''}`:'';
+  $('nowNext').innerHTML=mv.active&&mv.of>0&&nextEventText()?`next <b>${nextEventText()}</b>`:'';
   $('touching').innerHTML=mv.touching.length?'touching <b>'+mv.touching.map(escapeHtml).join(' · ')+'</b>'
       +(mv.skipped.length?` <span class="skip" title="parked outside safe range — skipped to avoid a jump">skipped ${mv.skipped.map(escapeHtml).join(' ')}</span>`:''):'';
   renderLegend();
@@ -700,7 +714,7 @@ function renderStage(mv,pct,hrDb){
   const sn=$('stageName'); sn.textContent=mv.name; sn.classList.toggle('idle',!mv.active);
   $('stageDesc').textContent=mv.active?moveDesc(mv.name):'';
   $('sMain').textContent=state.main.toFixed(2);
-  $('sNowNext').innerHTML=mv.active&&mv.of>0?`bar <b>${mv.bars}/${mv.of}</b>${nextEventText()?' · next '+nextEventText():''}`:'';
+  $('sNowNext').innerHTML=mv.active&&mv.of>0?`bar <b>${Math.min(mv.of,mv.bars+1)}/${mv.of}</b>${nextEventText()?' · next '+nextEventText():''}`:'';
   const sv=state.sv;
   $('stageName').style.display=(sv==='move')?'':'none';
   $('stageDesc').style.display=(sv==='move')?'':'none';
