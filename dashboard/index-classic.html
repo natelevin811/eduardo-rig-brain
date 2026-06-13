@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rig brain</title>
+<!-- Fonts degrade to system mono offline — the gig does not depend on wifi. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0c09; --panel: #16130f; --line: #292319;
+    --amber: #d49a3a; --rust: #b4552d; --teal: #3e9c94;
+    --green: #4f9c5e; --red: #c24536;
+    --txt: #e8dfd2; --dim: #6e6457;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    --disp: "Bricolage Grotesque", var(--mono);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--txt); font-family: var(--mono);
+    display: flex; flex-direction: column; gap: 10px; padding: 12px;
+    overflow: hidden; font-size: 13px;
+  }
+
+  /* ---- top strip ---- */
+  #top { display: flex; align-items: baseline; gap: 26px; padding: 8px 14px;
+         background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  #top .big { font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  #top .lbl { color: var(--dim); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; display:block; }
+  .dot { width: 13px; height: 13px; border-radius: 50%; display: inline-block;
+         background: var(--dim); vertical-align: -2px; }
+  .dot.alive { background: var(--teal); }
+  .dot.pulse { animation: pulse .22s ease-out; }
+  .dot.dead  { background: var(--red); }
+  @keyframes pulse { 0% { transform: scale(1.55); } 100% { transform: scale(1); } }
+  #modeBadge { margin-left: auto; padding: 4px 14px; border-radius: 6px; font-weight: 600;
+               letter-spacing: .15em; border: 1px solid var(--line); color: var(--dim); }
+  #modeBadge.show { background: var(--rust); color: #fff; border-color: var(--rust); }
+  #modeBadge.rehearse { background: transparent; color: var(--teal); border-color: var(--teal); }
+  .flag { padding: 3px 9px; border-radius: 5px; font-size: 10px; letter-spacing: .1em;
+          border: 1px solid var(--line); color: var(--dim); }
+  .flag.on { color: var(--amber); border-color: var(--amber); }
+
+  /* ---- banner ---- */
+  #banner { display: none; background: var(--red); color: #fff; text-align: center;
+            padding: 7px; border-radius: 8px; font-weight: 600; letter-spacing: .1em; }
+  #banner.show { display: block; }
+
+  /* ---- main grid ---- */
+  #mid { display: flex; gap: 10px; flex: 1; min-height: 0; }
+
+  /* bus row */
+  #buses { display: flex; gap: 8px; flex: 3; }
+  .bus { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+         padding: 8px; flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .bus h3 { font-size: 11px; color: var(--dim); letter-spacing: .1em; font-weight: 400; }
+  .meterWrap { flex: 1; display: flex; gap: 6px; min-height: 60px; }
+  .meterCol { width: 14px; background: #0a0908; border-radius: 3px; position: relative; overflow: hidden; }
+  .meterFill { position: absolute; bottom: 0; left: 0; right: 0; background: var(--teal);
+               transition: height 90ms linear; }
+  .meterFill.hot { background: var(--amber); }
+  .meterFill.over { background: var(--red); }
+  .spark { flex: 1; min-width: 0; }
+  .spark canvas { width: 100%; height: 100%; display: block; }
+  .trimVal { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .trimVal.active { color: var(--amber); }
+  .layers { color: var(--dim); font-size: 10px; }
+
+  /* main headroom */
+  #mainCard { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+              padding: 8px 10px; width: 84px; display: flex; flex-direction: column; gap: 6px; }
+  #mainBar { flex: 1; background: #0a0908; border-radius: 3px; position: relative; overflow: hidden; }
+  #mainFill { position: absolute; bottom: 0; left: 0; right: 0; background: var(--teal);
+              transition: height 90ms linear; }
+  #ceilLine { position: absolute; left: 0; right: 0; border-top: 2px solid var(--rust); }
+
+  /* ---- conductor panel ---- */
+  #conductor { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+               padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; flex: 2; min-width: 0; }
+  #moveName { font-family: var(--disp); font-size: 44px; font-weight: 700; color: var(--amber);
+              line-height: 1.05; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #moveName.idle { color: var(--dim); font-size: 28px; }
+  #progressWrap { height: 14px; background: #0a0908; border-radius: 7px; overflow: hidden; }
+  #progressFill { height: 100%; width: 0; background: linear-gradient(90deg, var(--rust), var(--amber)); }
+  #progressTxt, #touching, #nextStep { font-size: 12px; color: var(--dim); }
+  #touching span { color: var(--teal); }
+  #nextStep span { color: var(--amber); }
+
+  /* ---- bottom: alerts + ritual ---- */
+  #bottom { display: flex; gap: 10px; height: 132px; }
+  #alerts { flex: 2; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+            padding: 8px 12px; overflow-y: auto; }
+  .alertLine.replay { color: var(--dim); }
+  .alertLine.old { opacity: .45; }
+  #alertClear { float: right; font: inherit; font-size: 9px; color: var(--dim); background: none;
+                border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; cursor: pointer; }
+  #alertClear:hover { color: var(--teal); border-color: var(--teal); }
+  #alerts.clean { border-color: var(--green); padding: 0; height: 6px; flex: 2;
+                  background: var(--green); align-self: flex-end; }
+  #alerts.clean * { display: none; }
+  #alerts h3, #ritual h3 { font-size: 10px; color: var(--dim); letter-spacing: .14em;
+                           text-transform: uppercase; margin-bottom: 5px; }
+  .alertLine { font-size: 11px; color: var(--red); white-space: nowrap; overflow: hidden;
+               text-overflow: ellipsis; line-height: 1.6; }
+  .alertLine .k { color: var(--rust); }
+  #ritual { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+            padding: 8px 12px; overflow-y: auto; }
+  .rit { font-size: 11px; line-height: 1.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rit .ok { color: var(--green); } .rit .bad { color: var(--red); } .rit .hum { color: var(--amber); }
+</style>
+</head>
+<body>
+
+<div id="banner"></div>
+
+<div id="top">
+  <div><span class="lbl">beat</span><span class="big" id="beatClock">·</span></div>
+  <div><span class="lbl">bar</span><span class="big" id="barCount">–</span></div>
+  <div><span class="lbl">tempo</span><span class="big" id="tempo">–</span></div>
+  <div><span class="lbl">hearts</span>
+    <span class="dot" id="hbConductor" title="conductor"></span>
+    <span class="dot" id="hbSentinel" title="sentinel"></span>
+  </div>
+  <span class="flag" id="aliveFlag">ALIVE</span>
+  <span class="flag" id="dryFlag">DRY-RUN</span>
+  <span class="flag" id="arcFlag">NIGHT ARC</span>
+  <span class="flag" id="frozenFlag">FROZEN</span>
+  <div id="modeBadge" class="rehearse">REHEARSE</div>
+</div>
+
+<div id="mid">
+  <div id="buses"></div>
+  <div id="mainCard">
+    <h3 style="font-size:11px;color:var(--dim)">MAIN</h3>
+    <div id="mainBar"><div id="ceilLine"></div><div id="mainFill"></div></div>
+    <div class="trimVal" id="mainVal">–</div>
+  </div>
+  <div id="conductor">
+    <h3 style="font-size:10px;color:var(--dim);letter-spacing:.14em">CONDUCTOR</h3>
+    <div id="moveName" class="idle">idle</div>
+    <div id="progressWrap"><div id="progressFill"></div></div>
+    <div id="progressTxt"></div>
+    <div id="touching"></div>
+    <div id="nextStep"></div>
+  </div>
+</div>
+
+<div id="bottom">
+  <div id="alerts" class="clean"><h3>alerts <button id="alertClear" onclick="clearAlerts()">clear</button></h3><div id="alertList"></div></div>
+  <div id="ritual"><h3>ritual</h3><div id="ritList"><div class="rit" style="color:var(--dim)">not yet run</div></div></div>
+</div>
+
+<script>
+const BUSES = ['LoDrumsBus','HiDrumsBus','PercBus','BassBus','PadsBus','LeadsBus'];
+const SHORT = { LoDrumsBus:'LO DRM', HiDrumsBus:'HI DRM', PercBus:'PERC',
+                BassBus:'BASS', PadsBus:'PADS', LeadsBus:'LEADS' };
+const SPARK_LEN = 240; // ~60 s at 4 Hz
+
+const state = {
+  hb: { conductor: 0, sentinel: 0 },   // wall-clock ms of last heartbeat
+  spark: {}, sparkCtx: {},
+  alerts: [],
+  ceiling: 0.92
+};
+
+// build bus cards
+const busesEl = document.getElementById('buses');
+for (const b of BUSES) {
+  const card = document.createElement('div');
+  card.className = 'bus';
+  card.innerHTML = `
+    <h3>${SHORT[b]}</h3>
+    <div class="meterWrap">
+      <div class="meterCol"><div class="meterFill" id="m-${b}"></div></div>
+      <div class="spark"><canvas id="s-${b}"></canvas></div>
+    </div>
+    <div><span style="color:var(--dim);font-size:9px;letter-spacing:.08em">SENTRIM</span>
+    <span class="trimVal" id="t-${b}">0.0</span> <span style="color:var(--dim);font-size:10px">dB</span>
+    <span class="layers" id="l-${b}"></span></div>`;
+  busesEl.appendChild(card);
+  state.spark[b] = new Array(SPARK_LEN).fill(0);
+}
+// size canvases once layout settles
+requestAnimationFrame(() => {
+  for (const b of BUSES) {
+    const c = document.getElementById('s-' + b);
+    c.width = c.clientWidth * 2; c.height = c.clientHeight * 2;
+    state.sparkCtx[b] = c.getContext('2d');
+  }
+});
+
+function drawSpark(b) {
+  const ctx = state.sparkCtx[b];
+  if (!ctx) return;
+  const c = ctx.canvas, data = state.spark[b];
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.strokeStyle = '#3e9c94'; ctx.lineWidth = 2; ctx.beginPath();
+  for (let i = 0; i < data.length; i++) {
+    const x = (i / (data.length - 1)) * c.width;
+    const y = c.height - Math.min(1, data[i]) * c.height;
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.stroke();
+  // ceiling reference
+  ctx.strokeStyle = 'rgba(180,85,45,.5)'; ctx.lineWidth = 1; ctx.beginPath();
+  const cy = c.height - state.ceiling * c.height;
+  ctx.moveTo(0, cy); ctx.lineTo(c.width, cy); ctx.stroke();
+}
+
+function setFlag(id, on) { document.getElementById(id).classList.toggle('on', !!on); }
+
+// Alerts arriving within 1.5 s of (re)connect are the server's state REPLAY,
+// not new events — mark them ↻ and dim them so history reads as history.
+let connectedAt = 0;
+function pushAlert(kind, detail) {
+  const replay = connectedAt > 0 && Date.now() - connectedAt < 1500;
+  state.alerts.unshift({ kind, detail, at: new Date().toLocaleTimeString(), ts: Date.now(), replay });
+  state.alerts = state.alerts.slice(0, 40);
+  renderAlerts();
+  document.getElementById('alerts').classList.remove('clean');
+}
+function renderAlerts() {
+  const now = Date.now();
+  document.getElementById('alertList').innerHTML = state.alerts.map(a =>
+    `<div class="alertLine${a.replay ? ' replay' : ''}${now - a.ts > 120000 ? ' old' : ''}">` +
+    `<span class="k">${a.replay ? '↻ ' : ''}${a.at} ${a.kind}</span> ${a.detail}</div>`).join('');
+}
+function clearAlerts() {
+  state.alerts = [];
+  document.getElementById('alertList').innerHTML = '';
+  document.getElementById('alerts').classList.add('clean');
+}
+
+// ---- event handling -------------------------------------------------------
+function handle(ev) {
+  switch (ev.t) {
+    case 'hb': {
+      state.hb[ev.src] = Date.now();
+      const dot = document.getElementById(ev.src === 'conductor' ? 'hbConductor' : 'hbSentinel');
+      if (dot) {
+        dot.classList.remove('dead'); dot.classList.add('alive');
+        dot.classList.remove('pulse'); void dot.offsetWidth; dot.classList.add('pulse');
+      }
+      if (ev.src === 'conductor') {
+        document.getElementById('beatClock').textContent = (ev.beat % 4) + 1;
+        document.getElementById('barCount').textContent = ev.bar ?? '–';
+        if (ev.tempo) document.getElementById('tempo').textContent = ev.tempo;
+        setFlag('aliveFlag', ev.alive); setFlag('dryFlag', ev.dry);
+        setMode(ev.mode);
+        if (ev.disabled) pushAlert('subsystem', 'CONDUCTOR SELF-DISABLED');
+      } else {
+        setFlag('frozenFlag', ev.frozen); setFlag('arcFlag', ev.nightArc);
+        if (ev.disabled) pushAlert('subsystem', 'SENTINEL SELF-DISABLED');
+      }
+      break;
+    }
+    case 'meters': {
+      state.ceiling = ev.ceiling || 0.92;
+      const mf = document.getElementById('mainFill');
+      mf.style.height = Math.min(100, ev.main * 100) + '%';
+      mf.style.background = ev.main >= state.ceiling ? 'var(--red)'
+        : ev.main > state.ceiling - 0.075 ? 'var(--amber)' : 'var(--teal)';
+      document.getElementById('ceilLine').style.bottom = (state.ceiling * 100) + '%';
+      document.getElementById('mainVal').textContent = ev.main.toFixed(2);
+      for (const b of BUSES) {
+        const d = ev.buses?.[b]; if (!d) continue;
+        const fill = document.getElementById('m-' + b);
+        fill.style.height = Math.min(100, d.m * 100) + '%';
+        fill.className = 'meterFill' + (d.m >= state.ceiling ? ' over' : d.m > state.ceiling - 0.075 ? ' hot' : '');
+        const tv = document.getElementById('t-' + b);
+        tv.textContent = d.trim.toFixed(1);
+        tv.classList.toggle('active', d.trim < -0.05);
+        document.getElementById('l-' + b).textContent = d.layers ? '· ' + d.layers + ' loops' : '';
+        state.spark[b].push(d.m); state.spark[b].shift();
+        drawSpark(b);
+      }
+      break;
+    }
+    case 'move': {
+      const nameEl = document.getElementById('moveName');
+      if (ev.phase === 'start' || ev.phase === 'armed') {
+        nameEl.textContent = ev.name + (ev.dry ? ' (dry)' : '');
+        nameEl.classList.remove('idle');
+        document.getElementById('touching').innerHTML = ev.touching?.length
+          ? 'touching <span>' + ev.touching.join(' · ') + '</span>'
+          + (ev.skipped?.length ? ` <span style="color:var(--rust)">skipped ${ev.skipped.join(' ')}</span>` : '') : '';
+        document.getElementById('nextStep').innerHTML = ev.next ? 'next <span>' + ev.next + '</span>' : '';
+        if (ev.skipped?.length) pushAlert('sentry', ev.name + ' skipped: ' + ev.skipped.join(', '));
+      } else if (ev.phase === 'cleanslate') {
+        nameEl.textContent = 'CLEAN SLATE'; nameEl.classList.remove('idle');
+        setTimeout(() => handle({ t: 'move', phase: 'idle' }), 2500);
+      } else if (ev.phase === 'end' || ev.phase === 'idle' || ev.phase === 'superseded') {
+        if (!ev.next) {
+          nameEl.textContent = 'idle'; nameEl.classList.add('idle');
+          document.getElementById('progressFill').style.width = '0';
+          document.getElementById('progressTxt').textContent = '';
+          document.getElementById('touching').textContent = '';
+          document.getElementById('nextStep').textContent = '';
+        }
+      }
+      break;
+    }
+    case 'ramp': {
+      const pct = Math.min(100, (ev.bars / ev.of) * 100);
+      document.getElementById('progressFill').style.width = pct + '%';
+      document.getElementById('progressTxt').textContent = `bar ${ev.bars} / ${ev.of}`;
+      break;
+    }
+    case 'trim': {
+      // engage/release evidence lands in the log; surface engages briefly here
+      if (ev.phase === 'engage') pushAlert('trim', `${ev.bus} → ${ev.trim} dB (main ${ev.main}, hr ${ev.headroom})${ev.dry ? ' (DRY-RUN — not written)' : ''}`);
+      break;
+    }
+    case 'alert':         pushAlert(ev.kind || 'alert', ev.detail || ''); break;
+    case 'sentry_skip':   pushAlert('sentry', `${ev.param} captured out of range (${ev.captured})`); break;
+    case 'subsystem_down':pushAlert('subsystem', `${ev.sub} DOWN: ${ev.reason}`); break;
+    case 'mode':          setMode(ev.mode); break;
+    case 'alive':         setFlag('aliveFlag', ev.on); break;
+    case 'dryrun':        setFlag('dryFlag', ev.on); break;
+    case 'nightarc':      setFlag('arcFlag', ev.on); break;
+    case 'ritual': {
+      const el = document.getElementById('ritList');
+      const rows = [];
+      for (const f of ev.fixed || [])  rows.push(`<div class="rit"><span class="ok">✓</span> ${f}</div>`);
+      for (const f of ev.failed || []) rows.push(`<div class="rit"><span class="bad">✗</span> ${f}</div>`);
+      for (const v of ev.verify || []) {
+        const mark = v.human ? '<span class="hum">☐ human</span>'
+          : v.ok === 1 ? '<span class="ok">✓</span>' : v.ok === 0 ? '<span class="bad">✗</span>' : '<span class="hum">…</span>';
+        rows.push(`<div class="rit">${mark} ${v.name} <span style="color:var(--dim)">${v.detail || ''}</span></div>`);
+      }
+      el.innerHTML = rows.join('');
+      if ((ev.failed || []).length) pushAlert('ritual', ev.failed.length + ' fix steps failed');
+      break;
+    }
+  }
+}
+
+function setMode(m) {
+  if (!m) return;
+  const el = document.getElementById('modeBadge');
+  el.textContent = m;
+  el.className = m === 'SHOW' ? 'show' : 'rehearse';
+  el.id = 'modeBadge';
+}
+
+// ---- stale heartbeat + connection watchdog ---------------------------------
+setInterval(() => {
+  const now = Date.now();
+  const banner = document.getElementById('banner');
+  const stale = [];
+  for (const src of ['conductor', 'sentinel']) {
+    const dot = document.getElementById(src === 'conductor' ? 'hbConductor' : 'hbSentinel');
+    if (state.hb[src] && now - state.hb[src] > 3000) {
+      dot.classList.add('dead'); dot.classList.remove('alive');
+      stale.push(src.toUpperCase());
+    }
+  }
+  if (stale.length) {
+    banner.textContent = 'STALE HEARTBEAT: ' + stale.join(' + ') + ' — silence is never ambiguous';
+    banner.classList.add('show');
+  } else if (!es.failed) {
+    banner.classList.remove('show');
+  }
+  if (state.alerts.length) renderAlerts(); // refresh ↻/age dimming
+}, 500);
+
+// ---- SSE — one-way in, auto-reconnect ---------------------------------------
+let es = { failed: false };
+function connect() {
+  const src = new EventSource('/events');
+  es = src;
+  src.onmessage = (m) => { try { handle(JSON.parse(m.data)); } catch (e) {} };
+  src.onerror = () => {
+    es.failed = true;
+    const banner = document.getElementById('banner');
+    banner.textContent = 'TELEMETRY LINK DOWN — devices unaffected, reconnecting…';
+    banner.classList.add('show');
+  };
+  src.onopen = () => {
+    if (connectedAt > 0) pushAlert('link', 'reconnected — ↻ entries are replayed history, not new events');
+    connectedAt = Date.now();
+    es.failed = false;
+  };
+}
+connect();
+</script>
+</body>
+</html>

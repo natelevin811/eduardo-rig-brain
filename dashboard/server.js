@@ -117,6 +117,33 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  // one-click telemetry export: /log downloads today's session .jsonl, /log?raw=1
+  // streams it inline (for copy/paste). Read-only; never blocks the write stream.
+  if (req.url === '/log' || req.url.startsWith('/log?')) {
+    const inline = /[?&]raw=1/.test(req.url);
+    fs.access(logPath, fs.constants.R_OK, (err) => {
+      if (err) { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('no log yet for ' + dateTag); return; }
+      // no Content-Length: the file is being appended live, so stream it chunked
+      // to capture a consistent snapshot without truncation.
+      res.writeHead(200, {
+        'Content-Type': inline ? 'text/plain; charset=utf-8' : 'application/x-ndjson',
+        'Cache-Control': 'no-store',
+        'Content-Disposition': (inline ? 'inline' : 'attachment') + `; filename="${dateTag}-show.jsonl"`
+      });
+      fs.createReadStream(logPath).on('error', () => res.end()).pipe(res);
+    });
+    return;
+  }
+  // instant fallback to the known-good classic UI — reachable mid-show with no
+  // terminal: just type /classic. Never depends on the new UI being healthy.
+  if (req.url === '/classic' || req.url === '/index-classic.html') {
+    fs.readFile(path.join(__dirname, 'index-classic.html'), (err, buf) => {
+      if (err) { res.writeHead(500); res.end('classic page missing'); return; }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(buf);
+    });
+    return;
+  }
   res.writeHead(404);
   res.end();
 });
