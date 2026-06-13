@@ -20,7 +20,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13k iching';
+var BUILD = '2026-06-13m fired-cmd';
 (function () {
   var loc = '';
   try {
@@ -296,6 +296,14 @@ function _init() {
       REG.firedObserver.property = 'fired_slot_index';
     }
     REG.cmdObserverId = ctId;
+    // poll baseline: on this rig the slot-index observers above silently never
+    // fire (same machine where is_playing must be polled). pollCommandSlots in
+    // clockTick reads these slots and synthesizes the missed callback; seed the
+    // baseline to NOW so an already-armed clip at load isn't replayed as a press.
+    REG.lastSeenPlaying = parseInt(REG.cmdObserver.get('playing_slot_index'), 10);
+    if (isNaN(REG.lastSeenPlaying)) REG.lastSeenPlaying = -1;
+    REG.lastSeenFired = parseInt(REG.firedObserver.get('fired_slot_index'), 10);
+    if (isNaN(REG.lastSeenFired)) REG.lastSeenFired = -1;
   }
 
   // --- transport observer (read-only: we listen, we never speak) ---------------
@@ -369,17 +377,22 @@ function reportResolution() {
 }
 
 // ---------------------------------------------------------------------------
-// command intake — clip launches on the CONDUCTOR track are the command surface
+// command intake — a clip LAUNCH on the CONDUCTOR track is the command surface.
+//
+// We trigger on fired_slot_index, NOT playing_slot_index. fired_slot_index
+// changes on EVERY launch press, the instant you hit it, whether or not the
+// clip ever reaches "playing". On the rig (2026-06-13) playing_slot_index never
+// latched on a launch — so the playing-based handler AND its poll saw nothing
+// and every command was lost, though the engine, clock and grab pool were fine.
+// fired is the signal that actually moves; read the clip name from that slot.
 // ---------------------------------------------------------------------------
-function onPlayingSlot(args) {
+function dispatchCommand(slotIdx) {
   jailRun('command', function () {
-    if (String(args[0]) !== 'playing_slot_index') return;
-    var slotIdx = parseInt(args[1], 10);
-    if (isNaN(slotIdx) || slotIdx < 0 || !S.ready) return;
+    if (isNaN(slotIdx) || slotIdx < 0 || !S.ready || !REG.conductorTrackPath) return;
     var clip = new LiveAPI(REG.conductorTrackPath + ' clip_slots ' + slotIdx + ' clip');
     var name = String(clip.get('name'));
     var parsed = parseCommand(name);
-    if (!parsed) return; // unlabeled clip — not ours
+    if (!parsed) return; // unlabeled / empty slot — not a command
     if (parsed.invalid) {
       Telemetry.alert('bad_command', name + ' — ' + parsed.invalid);
       return;
@@ -393,17 +406,29 @@ function onPlayingSlot(args) {
   });
 }
 
+// fired_slot_index observer — the primary (and on this rig, only working)
+// command trigger. Every change to a real slot is one launch press = one
+// command; the reset back to -1 when the clip starts/stops is ignored. Deduped
+// against the poll (pollCommandSlots) via REG.lastSeenFired so whichever sees
+// the change first dispatches and the other no-ops.
 function onFiredSlot(args) {
-  jailRun('command-retrigger', function () {
-    if (String(args[0]) !== 'fired_slot_index') return;
-    var idx = parseInt(args[1], 10);
-    if (isNaN(idx) || idx < 0 || !S.ready || !REG.cmdObserver) return;
-    var cur = parseInt(REG.cmdObserver.get('playing_slot_index'), 10);
-    if (idx !== cur) return; // normal launch — the playing_slot_index handler owns it
-    dbg('command retrigger on slot ' + idx + ' — re-arming');
-    onPlayingSlot(['playing_slot_index', idx]);
-  });
+  if (String(args[0]) !== 'fired_slot_index') return;
+  var idx = parseInt(args[1], 10);
+  if (isNaN(idx)) idx = -1;
+  if (idx === REG.lastSeenFired) return;
+  REG.lastSeenFired = idx;
+  if (idx >= 0) { dbg('command on fired_slot ' + idx); dispatchCommand(idx); }
 }
+
+// playing_slot_index observer — kept bound (harmless) but no longer drives
+// command intake. Left in place so the bind/rebind bookkeeping is unchanged and
+// so a machine where it DOES fire still tracks cleanly.
+function onPlayingSlot(args) {
+  if (String(args[0]) !== 'playing_slot_index') return;
+  var slotIdx = parseInt(args[1], 10);
+  if (!isNaN(slotIdx)) REG.lastSeenPlaying = slotIdx;
+}
+
 
 function supersede() {
   if (S.activeMove) {
@@ -673,11 +698,39 @@ function clockTick() {
         onIsPlaying(['is_playing', p ? 1 : 0]);
       }
     }
+    // command-slot reconcile (rig 2026-06-13: after a device reload the
+    // playing_slot_index / fired_slot_index observers silently never fired —
+    // every command-clip press went unseen, the move name stuck on 'idle'
+    // though the engine, clock and grab pool were all fine). Same fix as the
+    // is_playing poll above: read the slot indices ~7 Hz and synthesize the
+    // missed observer callback. READ-only (.get) — Link-safe; id-pinned path —
+    // position-proof. Deduped against the real observer via REG.lastSeen*.
+    CLOCK.slotPolls = (CLOCK.slotPolls || 0) + 1;
+    if (CLOCK.slotPolls >= 4) { CLOCK.slotPolls = 0; pollCommandSlots(); }
     if (nowMs() - CLOCK.lastExtSyncMs < 500) return; // plugsync~ chain alive — defer
     if (!REG.liveSet) return;
     var b = parseFloat(REG.liveSet.get('current_song_time'));
     if (!isNaN(b)) _sync(b);
   });
+}
+
+// Poll the CONDUCTOR track's launch slots and synthesize the observer callback
+// the runtime dropped (see clockTick). Mirrors the observer dispatch exactly:
+// a change in playing_slot_index is a fresh command; a change in fired_slot_index
+// while it equals the playing slot is a retrigger. Updating REG.lastSeen* both
+// here and inside the real handlers means whichever path sees a change first
+// records it and the other no-ops — so this is safe even where the observer works.
+function pollCommandSlots() {
+  if (!S.ready || !REG.firedObserver) return;
+  var fired = parseInt(REG.firedObserver.get('fired_slot_index'), 10);
+  if (isNaN(fired)) fired = -1;
+  if (fired !== REG.lastSeenFired) {
+    REG.lastSeenFired = fired;
+    if (fired >= 0) {
+      dbg('command seen via poll: fired_slot ' + fired + ' — observer missed it');
+      dispatchCommand(fired);
+    }
+  }
 }
 
 // TRUST GATE (perf machine 2026-06-12): plugsync~ outlet maps differ between
@@ -1022,6 +1075,19 @@ function grabtest() {
         ' bars=' + (Math.round(((S.nowBeats - S.activeMove.startBeat) / S.beatsPerBar) * 100) / 100) +
         '/' + S.activeMove.totalBars + ' slots=[' + mvSlots.join(',') + ']';
     }
+    // slot readout — the command-intake diagnostic. Launch a CONDUCTOR clip,
+    // then press TEST: if firedSlot shows the launched slot, the command path
+    // can see it. If it stays -1 after a launch, the clips aren't reporting on
+    // this rig and command intake can't work — that's the rollback signal.
+    var slotInfo = 'n/a';
+    if (REG.conductorTrackPath) {
+      try {
+        var ctApi = new LiveAPI(REG.conductorTrackPath);
+        slotInfo = 'fired=' + String(ctApi.get('fired_slot_index')) +
+          ' playing=' + String(ctApi.get('playing_slot_index')) +
+          ' trk=' + REG.conductorTrackPath;
+      } catch (eSlot) { slotInfo = 'READ-ERR'; }
+    }
     var probe = 'clock probe [' + BUILD + ']: is_playing=' + ip + ' song_time=' + cst +
       ' nowBeats=' + S.nowBeats +
       ' extSync=' + (extAge < 0 ? 'never' : Math.round(extAge) + 'ms ago') +
@@ -1029,6 +1095,7 @@ function grabtest() {
       ' ready=' + (S.ready ? 1 : 0) +
       ' jailErrs=' + JAIL.total + (JAIL.disabled ? ' DISABLED' : '') +
       ' drive=' + (S.apiDrive ? 'API' : 'remote~') +
+      ' slots=' + slotInfo +
       ' move=' + mvInfo;
     dbg(probe);
     Telemetry.alert('clockprobe', probe);
