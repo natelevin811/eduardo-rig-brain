@@ -20,7 +20,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13c move-probe';
+var BUILD = '2026-06-13d retrigger';
 (function () {
   var loc = '';
   try {
@@ -253,6 +253,15 @@ function _init() {
       REG.cmdObserver = new LiveAPI(onPlayingSlot, REG.conductorTrackPath);
       REG.cmdObserver.property = 'playing_slot_index';
     }
+    // retrigger blind spot (rig 2026-06-13: WASH and RISE needed two presses):
+    // relaunching the clip that's still flagged playing never changes
+    // playing_slot_index, so the press was invisible. fired_slot_index changes
+    // on EVERY press; when the fired slot is already the playing slot, treat
+    // it as a fresh command.
+    if (!REG.firedObserver) {
+      REG.firedObserver = new LiveAPI(onFiredSlot, REG.conductorTrackPath);
+      REG.firedObserver.property = 'fired_slot_index';
+    }
   }
 
   // --- transport observer (read-only: we listen, we never speak) ---------------
@@ -340,6 +349,18 @@ function onPlayingSlot(args) {
     supersede();
     S.seqQueue = parsed.steps.slice(0);
     startNextStep();
+  });
+}
+
+function onFiredSlot(args) {
+  jailRun('command-retrigger', function () {
+    if (String(args[0]) !== 'fired_slot_index') return;
+    var idx = parseInt(args[1], 10);
+    if (isNaN(idx) || idx < 0 || !S.ready || !REG.cmdObserver) return;
+    var cur = parseInt(REG.cmdObserver.get('playing_slot_index'), 10);
+    if (idx !== cur) return; // normal launch — the playing_slot_index handler owns it
+    dbg('command retrigger on slot ' + idx + ' — re-arming');
+    onPlayingSlot(['playing_slot_index', idx]);
   });
 }
 
