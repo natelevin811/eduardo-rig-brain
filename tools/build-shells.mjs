@@ -249,12 +249,17 @@ function addFaceControls(B, js, controls, x, y) {
     const presW = c.kind === 'tab' ? 110 : 70;
     const pres = { presentation: 1, presentation_rect: [presX, 20, presW, 18] };
     presX += presW + 4;
+    // annotation -> Live's bottom-left Info View on hover (annotation_name is the title)
+    const ann = c.annotation
+      ? { annotation: c.annotation, annotation_name: c.annotationName || c.label || (c.message || '').toUpperCase() }
+      : {};
     if (c.kind === 'tab') {
       // live.tab -> sel 0 1 -> [mode A( / [mode B(
       const tab = B.box('live.tab', null, cx, cy, 1, 3, {
         varname: c.varname || 'ctl_' + i,
         saved_attribute_attributes: { valueof: { parameter_enum: c.tabs } },
         parameter_enable: 1,
+        ...ann,
         ...pres,
       });
       const sel = B.obj('sel 0 1', cx, cy + 40, 2, 3);
@@ -275,6 +280,7 @@ function addFaceControls(B, js, controls, x, y) {
         text: c.label,
         mode: 0, // Button
         parameter_enable: 1,
+        ...ann,
         ...pres,
       });
       const m = B.msg(c.message, cx, cy + 40);
@@ -287,6 +293,7 @@ function addFaceControls(B, js, controls, x, y) {
         text: c.label,
         mode: 1, // Toggle
         parameter_enable: 1,
+        ...ann,
         ...pres,
       });
       const m = B.msg(c.message + ' $1', cx, cy + 40);
@@ -330,11 +337,16 @@ function buildConductor(patcher) {
     B,
     js,
     [
-      { kind: 'toggle', label: 'ALIVE', message: 'alive', varname: 'ctl_alive' },
-      { kind: 'toggle', label: 'DRY-RUN', message: 'dryrun', varname: 'ctl_dryrun' },
-      { kind: 'tab', message: 'mode', tabs: ['REHEARSE', 'SHOW'], varname: 'ctl_mode' },
-      { kind: 'button', label: 'ABORT', message: 'abort', varname: 'ctl_abort' },
-      { kind: 'button', label: 'TEST', message: 'grabtest', varname: 'ctl_grabtest' },
+      { kind: 'toggle', label: 'ALIVE', message: 'alive', varname: 'ctl_alive',
+        annotation: 'Gentle idle drift on Pads/Leads sends so a held mix never sounds frozen. Hands always win; auto-suspends during moves. Off by default.' },
+      { kind: 'toggle', label: 'DRY-RUN', message: 'dryrun', varname: 'ctl_dryrun',
+        annotation: 'Engine runs and the dashboard shows everything, but nothing is written into Live. Rehearse moves silently. Locked off in SHOW.' },
+      { kind: 'tab', message: 'mode', tabs: ['REHEARSE', 'SHOW'], varname: 'ctl_mode', annotationName: 'MODE',
+        annotation: 'REHEARSE: chatty, auto-RITUAL, full telemetry. SHOW: quiet, rate-capped, nothing automatic.' },
+      { kind: 'button', label: 'ABORT', message: 'abort', varname: 'ctl_abort',
+        annotation: 'Kill the current move/sequence now — release all grabs and snap parameters to rest. Kill-order layer 2.' },
+      { kind: 'button', label: 'TEST', message: 'grabtest', varname: 'ctl_grabtest',
+        annotation: 'Grab-pool probe + re-resolve: nudges PadsBus send B and PercBus DJ to prove control works, and re-runs name resolution if anything is unresolved.' },
     ],
     60,
     1050
@@ -363,10 +375,14 @@ function buildSentinel(patcher) {
     B,
     js,
     [
-      { kind: 'button', label: 'RITUAL', message: 'ritual', varname: 'ctl_ritual' },
-      { kind: 'toggle', label: 'NIGHT ARC', message: 'nightarc', varname: 'ctl_nightarc' },
-      { kind: 'tab', message: 'mode', tabs: ['REHEARSE', 'SHOW'], varname: 'ctl_mode' },
-      { kind: 'toggle', label: 'DRY-RUN', message: 'dryrun', varname: 'ctl_dryrun' },
+      { kind: 'button', label: 'RITUAL', message: 'ritual', varname: 'ctl_ritual',
+        annotation: 'Pre-show reset + verify: center DJ filters & crossfader, EQ unity, zero SENTRIM trims, set capture marks, re-resolve names. Run before the set.' },
+      { kind: 'toggle', label: 'NIGHT ARC', message: 'nightarc', varname: 'ctl_nightarc',
+        annotation: 'Slow over-the-night release bias: lets bus trims settle slightly low across the evening (max -2 dB). Off by default.' },
+      { kind: 'tab', message: 'mode', tabs: ['REHEARSE', 'SHOW'], varname: 'ctl_mode', annotationName: 'MODE',
+        annotation: 'REHEARSE: chatty, auto-RITUAL, full telemetry. SHOW: quiet, rate-capped, nothing automatic.' },
+      { kind: 'toggle', label: 'DRY-RUN', message: 'dryrun', varname: 'ctl_dryrun',
+        annotation: 'Compute and display headroom trims but write nothing into Live. Rehearse the guard silently.' },
     ],
     60,
     1050
