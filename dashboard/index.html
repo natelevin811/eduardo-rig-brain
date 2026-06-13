@@ -377,7 +377,7 @@
     <div class="resize" data-resize="p-ritual"></div>
   </section>
 
-  <section class="panel" id="p-iching" data-c="4" data-r="2" draggable="false" style="--accent:var(--violet)">
+  <section class="panel" id="p-iching" data-c="7" data-r="2" draggable="false" style="--accent:var(--violet)">
     <div class="head"><span class="grip">⠿</span><span class="ttl">i ching</span>
       <span class="sub">— the cast, when ICHING runs</span><span class="hidebtn" data-hide="p-iching">×</span></div>
     <div class="body"><div id="ichingBody"><div id="ichingEmpty">no reading yet — launch an <b>ICHING</b> clip</div>
@@ -816,7 +816,7 @@ buildViewChips();
 
 // ============================ layout ============================
 const GRID=$('grid'), LS_KEY='rigdash.layout.v3';
-const PANELS=['p-move','p-head','p-dj','p-buses','p-alerts','p-ritual'];
+const PANELS=['p-move','p-head','p-dj','p-buses','p-alerts','p-ritual','p-iching'];
 function rowUnit(){ return Math.max(54,Math.min(150,(window.innerHeight-170)/8)); }
 function applyRowUnit(){ document.documentElement.style.setProperty('--row',rowUnit()+'px'); }
 function saveLayout(){ try{
@@ -830,7 +830,7 @@ function loadLayout(){ let L=null; try{ L=JSON.parse(localStorage.getItem(LS_KEY
     if(L.hidden) for(const id of PANELS){ const p=$(id); if(p) p.style.display=L.hidden.includes(id)?'none':''; } }
   for(const id of PANELS){ const p=$(id); if(p) applySpan(p); } renderTray(); }
 function resetLayout(){ try{ localStorage.removeItem(LS_KEY); }catch(e){}
-  const defs={'p-move':[8,4],'p-head':[4,2],'p-dj':[4,2],'p-buses':[12,2],'p-alerts':[7,2],'p-ritual':[5,2]};
+  const defs={'p-move':[8,4],'p-head':[4,2],'p-dj':[4,2],'p-buses':[12,2],'p-alerts':[7,2],'p-ritual':[5,2],'p-iching':[7,2]};
   for(const id of PANELS){ const p=$(id); GRID.appendChild(p); p.dataset.c=defs[id][0]; p.dataset.r=defs[id][1]; p.style.display=''; applySpan(p); }
   renderTray(); saveLayout(); }
 let dragId=null;

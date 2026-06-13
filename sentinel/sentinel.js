@@ -22,7 +22,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13g trim-clarity';
+var BUILD = '2026-06-13q ritual-fast';
 (function () {
   var loc = '';
   try {
@@ -36,7 +36,9 @@ include("resolver.js");
 include("telemetry.js");
 
 var SETMAP_FILE = "eduardo-setmap.json";
-var TICK_MS = 100;            // 10 Hz control loop
+var TICK_MS = 200;            // 5 Hz control loop (was 10 Hz — halves LOM
+                             // polling to ease Live UI stutter; light-touch
+                             // only acts past the ceiling so 5 Hz is ample)
 var HISTORY_SECONDS = 60;     // sparkline depth
 
 // NIGHT ARC — optional governor, default OFF. ±2 dB total authority, expressed
@@ -48,12 +50,27 @@ var NIGHT_ARC = {
   maxBiasDb: -2.0   // hard cap, spec law
 };
 
+// LIGHT TOUCH — gig 2026-06-13, default ON at Eduardo's request. Two changes
+// from the protective default: (1) NO soft-knee — the sentinel only acts once
+// Main is genuinely PAST the ceiling, never pre-emptively in the headroom band;
+// (2) near-zero authority on LoDrums/Bass — the performer rides the kick and
+// bass by hand, so the sentinel barely touches them. Pads/Leads/Perc/HiDrums
+// keep full clamp so a stacked-loop runaway is still caught (just later, harder).
+// Trade-off acknowledged: protects the mix less; the faders are the backstop.
+// Toggle live with [lighttouch 0/1]; resets to ON on every (re)load.
+var LIGHT_TOUCH = {
+  on: true,
+  kickBassClampDb: -1.0  // most the sentinel may pull LoDrums/Bass in light mode
+};
+
 var S = {
   ready: false,
   setmap: null,
   mode: 'REHEARSE',
   dryRun: false,
   nightArcOn: false,
+  lightTouch: true,      // gig default — see LIGHT_TOUCH above; resets ON each load
+  bypassed: false,       // panic: control law halted + trims zeroed until resume
   frozen: false,         // transport stopped → sentinel freezes
   beatsPerBar: 4,
   nowBeats: 0,
@@ -208,7 +225,10 @@ function _init() {
 
   S.ready = true;
   reportResolution();
-  Telemetry.emit('boot', { sub: 'sentinel', missing: Resolver.getMissing().length, mode: S.mode });
+  Telemetry.emit('boot', { sub: 'sentinel', missing: Resolver.getMissing().length, mode: S.mode,
+                           lightTouch: S.lightTouch ? 1 : 0 });
+  if (S.lightTouch) dbg('LIGHT TOUCH on: trims act only past ceiling; LoDrums/Bass capped at '
+                        + LIGHT_TOUCH.kickBassClampDb + ' dB');
 
   // pattr may have restored trims before we were ready — apply them now
   if (S.pendingTrims) { applyTrims(S.pendingTrims); S.pendingTrims = null; }
@@ -250,7 +270,7 @@ function reportResolution() {
 }
 
 // ---------------------------------------------------------------------------
-// the loop — 10 Hz
+// the loop — 5 Hz (TICK_MS). PANIC/bypass short-circuits all heavy polling.
 // ---------------------------------------------------------------------------
 var tickCount = 0;
 
@@ -260,8 +280,26 @@ function tick() {
   if (!S.ready) return;
   tickCount++;
 
-  // 0) beat clock fallback — see sync() below (rig 2026-06-12)
+  // 0) beat clock fallback — see sync() below (rig 2026-06-12). Always runs so
+  // the heartbeat keeps pulsing even when bypassed.
   clockFallback();
+
+  // 0b) transport reconcile (perf machine 2026-06-12): the live_set is_playing
+  // observer can silently never fire on some machines — FROZEN then sticks and
+  // the control law never re-arms. Poll the same READ and synthesize the missed
+  // callback. Cheap; runs even when bypassed so re-arming is instant.
+  if (tickCount % 2 === 0) {
+    var tPlay = Resolver.readIsPlaying() === 1;
+    if (S.frozen !== !tPlay) {
+      dbg('transport ' + (tPlay ? 'started' : 'stopped') + ' seen via poll — observer missed it');
+      onIsPlaying(['is_playing', tPlay ? 1 : 0]);
+    }
+  }
+
+  // PANIC / bypass: emergency off. Skip ALL meter/census/control/capture LOM
+  // polling — that main-thread work is what stutters Live. Device stays alive
+  // (heartbeat above) and transport-aware; trims were zeroed in panic().
+  if (S.bypassed) return;
 
   // 1) meters
   var mainMeter = parseFloat(S.mainApi.get('output_meter_level'));
@@ -274,29 +312,21 @@ function tick() {
   }
 
   // 2) loop census every 2 s
-  if (tickCount % 20 === 0) census();
-
-  // 2b) transport reconcile (perf machine 2026-06-12): the live_set is_playing
-  // observer can silently never fire on some machines — FROZEN then sticks and
-  // the control law never re-arms. Poll the same READ at 2 Hz and synthesize
-  // the missed callback. Same philosophy as the clock trust gate.
-  if (tickCount % 5 === 0) {
-    var tPlay = Resolver.readIsPlaying() === 1;
-    if (S.frozen !== !tPlay) {
-      dbg('transport ' + (tPlay ? 'started' : 'stopped') + ' seen via poll — observer missed it');
-      onIsPlaying(['is_playing', tPlay ? 1 : 0]);
-    }
-  }
+  if (tickCount % 10 === 0) census();
 
   // 3) control law (frozen on transport stop — trims hold, nothing moves)
   if (!S.frozen && !JAIL.disabled) controlLaw(mainMeter);
 
-  // 4) capture-sanity watcher every 500 ms
-  if (tickCount % 5 === 0) captureSanity();
+  // 4) capture-sanity watcher — REHEARSE-only, every 2 s. It creates LOM
+  // objects per playing CL lane; running it at 10 Hz during playback was a
+  // main-thread stutter source (rig 2026-06-13: Live UI hitched, cleared when
+  // SENTINEL was removed). It's evidence/logging, never control — so SHOW
+  // skips it entirely and REHEARSE runs it lazily.
+  if (S.mode !== 'SHOW' && tickCount % 10 === 0) captureSanity();
 
   // 4b) drive watchdog every 1 s: verify the last trim write actually landed.
   // remote~ vals from Task context vanish on this runtime; API sets land.
-  if (!S.apiDrive && !S.dryRun && tickCount % 10 === 0) {
+  if (!S.apiDrive && !S.dryRun && tickCount % 5 === 0) {
     for (var wdI = 0; wdI < S.buses.length; wdI++) {
       var wdB = S.buses[wdI];
       if (!wdB || !wdB.grabbed || wdB.lastSent === undefined || wdB.lastSent === null) continue;
@@ -367,6 +397,13 @@ function controlLaw(mainMeter) {
     // census feedforward: layers stacked on this bus widen its knee — expect
     // the creep at 3 layers deep and meet it early instead of reacting late.
     var kneeTop = 3.0 + Math.min(1.5, 0.5 * Math.max(0, b.layers - 1));
+    // LIGHT TOUCH: kill the soft knee (act only past the ceiling) and hold
+    // near-zero authority on LoDrums/Bass. See LIGHT_TOUCH at top.
+    if (S.lightTouch) kneeTop = 0; // knee off → the soft-knee branch never fires
+    var effClamp = b.clampLow;
+    if (S.lightTouch && (b.name === 'LoDrumsBus' || b.name === 'BassBus')) {
+      effClamp = Math.max(b.clampLow, LIGHT_TOUCH.kickBassClampDb);
+    }
 
     var wantTrim = false, slew = 0;
     if (dom === b) {
@@ -376,7 +413,7 @@ function controlLaw(mainMeter) {
 
     if (wantTrim) {
       var before = b.trimDb;
-      b.trimDb = Math.max(b.clampLow, b.trimDb - slew);
+      b.trimDb = Math.max(effClamp, b.trimDb - slew);
       b.comfortTicks = 0;
       if (b.trimDb !== before) {
         writeTrim(b);
@@ -575,6 +612,7 @@ function _ritual() {
     _init();
     if (!S.ready) { Telemetry.alert('ritual', 'sentinel not initialized'); return; }
   }
+  Resolver.clearTrackCache(); // rescan the set once; reused across all the fixes below
   var fixed = [], failed = [], i;
 
   function fix(label, fn) {
@@ -752,6 +790,58 @@ function nightarc(v) {
     S.nightArcOn = parseInt(v, 10) === 1;
     uiOut('nightarc', S.nightArcOn ? 1 : 0);
     Telemetry.emit('nightarc', { on: S.nightArcOn ? 1 : 0, bias: round2(nightArcBiasDb()) });
+  });
+}
+
+// LIGHT TOUCH toggle (default ON, resets ON each reload). When turned OFF the
+// full protective law returns: soft knee + full LoDrums/Bass clamps.
+function lighttouch(v) {
+  jailRun('lighttouch', function () {
+    S.lightTouch = (v === undefined || v === null || String(v) === 'bang')
+      ? !S.lightTouch : (parseInt(v, 10) === 1); // bare press (button bang) toggles
+    uiOut('lighttouch', S.lightTouch ? 1 : 0);
+    Telemetry.emit('lighttouch', { on: S.lightTouch ? 1 : 0, kickBassClampDb: LIGHT_TOUCH.kickBassClampDb });
+    dbg('LIGHT TOUCH ' + (S.lightTouch ? 'ON — gentle; faders own kick/bass' : 'OFF — full protective law'));
+  });
+}
+
+// zero every SENTRIM trim immediately (release grab + write 0 dB).
+function zeroAllTrims() {
+  for (var i = 0; i < S.buses.length; i++) {
+    var b = S.buses[i];
+    if (!b.trimInfo) continue;
+    b.trimDb = 0;
+    grabOff(b);
+    if (!S.dryRun) Resolver.set(Resolver.byId(b.trimInfo.id), 'value', 0);
+  }
+}
+
+// PANIC — emergency off. Zeros every trim and HALTS the control law until
+// resume. One-button safety: [panic] toggles; [panic 1]/[panic 0] set it
+// explicitly (a toggle live.text wired to `panic $1` latches it cleanly).
+// Not persisted — a re-drag also clears the bypass.
+function panic(v) {
+  jailRun('panic', function () {
+    var on = (v === undefined || v === null || String(v) === 'bang')
+      ? !S.bypassed : (parseInt(v, 10) === 1);
+    S.bypassed = on;
+    if (on) zeroAllTrims();
+    uiOut('bypassed', on ? 1 : 0);
+    Telemetry.emit('bypass', { on: on ? 1 : 0 });
+    Telemetry.alert('bypass', on ? 'SENTINEL BYPASSED — trims zeroed, control law halted'
+                                 : 'SENTINEL resumed — control law active');
+    dbg(on ? 'PANIC: trims zeroed + control law halted (send resume / panic 0 to re-arm)'
+           : 'RESUMED: control law active');
+  });
+}
+function resume() { panic(0); }
+
+// reset trims to 0 WITHOUT disabling the sentinel (it keeps protecting).
+function resettrims() {
+  jailRun('resettrims', function () {
+    zeroAllTrims();
+    Telemetry.alert('reset', 'SENTRIM trims reset to 0');
+    dbg('SENTRIM trims reset to 0 (control law still active)');
   });
 }
 
