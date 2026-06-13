@@ -20,7 +20,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13d retrigger';
+var BUILD = '2026-06-13e event-trace';
 (function () {
   var loc = '';
   try {
@@ -694,11 +694,21 @@ function _sync(beats) {
 }
 
 function runEvent(action) {
-  if (action === 'fireRiser' && REG.riserSlot && !S.dryRun) Resolver.call(REG.riserSlot, 'fire');
-  if (action === 'killRiser' && REG.riserSlot && !S.dryRun) Resolver.call(REG.riserSlot, 'stop');
-  if (action === 'fireShep' && REG.shepSlot && !S.dryRun) Resolver.call(REG.shepSlot, 'fire');
-  if (action === 'killShep' && REG.shepSlot && !S.dryRun) Resolver.call(REG.shepSlot, 'stop');
-  Telemetry.emit('event', { action: action, dry: S.dryRun ? 1 : 0 });
+  var slot = (action === 'fireRiser' || action === 'killRiser') ? REG.riserSlot
+           : (action === 'fireShep' || action === 'killShep') ? REG.shepSlot : null;
+  var verb = (action.indexOf('fire') === 0) ? 'fire' : 'stop';
+  if (S.dryRun) { Telemetry.emit('event', { action: action, dry: 1 }); return; }
+  if (!slot) {
+    // this is how a RISE swells silence: the macro sweeps but no clip plays
+    dbg('EVENT ' + action + ' SKIPPED — clip slot never resolved');
+    Telemetry.alert('event', action + ' SKIPPED — clip slot never resolved');
+    return;
+  }
+  var ok = Resolver.call(slot, verb);
+  dbg('EVENT ' + action + ' ' + verb + ' ok=' + ok);
+  Telemetry.alert('event', action + ' → ' + verb + (ok ? ' sent' : ' REFUSED') +
+    ' @ ' + (slot.unquotedpath || String(slot.path)));
+  Telemetry.emit('event', { action: action, ok: ok ? 1 : 0 });
 }
 
 // ---------------------------------------------------------------------------
