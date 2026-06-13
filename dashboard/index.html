@@ -87,6 +87,27 @@
   body.showmode #btnLog, body.showmode #btnCopy,
   body.showmode #btnEdit, body.showmode #btnReset,
   body.showmode #p-alerts { display:none !important; }
+  /* I Ching panel */
+  #ichingBody { display:flex; gap:18px; align-items:center; height:100%; }
+  #ichingEmpty { color:var(--dim); font-size:13px; }
+  #ichingCard { display:flex; gap:20px; align-items:center; width:100%; }
+  #ichingLines { display:flex; flex-direction:column-reverse; gap:7px; flex:0 0 auto; }
+  #ichingLines .ln { display:flex; align-items:center; gap:9px; height:13px; }
+  #ichingLines .bar { display:flex; gap:8px; width:78px; }
+  #ichingLines .bar span { height:11px; border-radius:3px; background:var(--violet); box-shadow:0 0 8px rgba(138,111,192,.35); }
+  #ichingLines .bar.yang span { width:100%; }
+  #ichingLines .bar.yin span { width:46%; }
+  #ichingLines .ln.changing .bar span { background:var(--amber); box-shadow:0 0 10px rgba(224,162,63,.5); }
+  #ichingLines .mk { font-family:var(--mono); font-size:10px; color:var(--amber); width:10px; }
+  #ichingLines .ln:not(.changing) .mk { color:transparent; }
+  #ichingMeta { flex:1; min-width:0; }
+  #ichingPresent { font-family:var(--disp); font-weight:800; font-size:20px; color:var(--txt); line-height:1.1; }
+  #ichingPresent .gly { color:var(--violet); margin-right:8px; font-size:18px; }
+  #ichingPresent .nm { color:var(--txt2); font-weight:500; font-size:14px; display:block; margin-top:2px; }
+  #ichingRelating { font-size:12.5px; color:var(--txt2); margin-top:10px; }
+  #ichingRelating b { color:var(--amber); }
+  #ichingNote { font-size:11px; color:var(--dim); margin-top:10px; }
+  #p-iching.spent { opacity:.62; }
 
   #grid { display:grid; grid-template-columns:repeat(12,1fr); gap:var(--gap); grid-auto-rows:var(--row);
           grid-auto-flow:row dense; flex:1; min-height:0; align-content:start; }
@@ -355,6 +376,21 @@
     <div class="body"><div id="ritList"><div class="rit dt">not yet run</div></div></div>
     <div class="resize" data-resize="p-ritual"></div>
   </section>
+
+  <section class="panel" id="p-iching" data-c="4" data-r="2" draggable="false" style="--accent:var(--violet)">
+    <div class="head"><span class="grip">⠿</span><span class="ttl">i ching</span>
+      <span class="sub">— the cast, when ICHING runs</span><span class="hidebtn" data-hide="p-iching">×</span></div>
+    <div class="body"><div id="ichingBody"><div id="ichingEmpty">no reading yet — launch an <b>ICHING</b> clip</div>
+      <div id="ichingCard" style="display:none">
+        <div id="ichingLines"></div>
+        <div id="ichingMeta">
+          <div id="ichingPresent"></div>
+          <div id="ichingRelating"></div>
+          <div id="ichingNote">changing lines ◇ pulse the relating hexagram. ABORT ends it.</div>
+        </div>
+      </div></div></div>
+    <div class="resize" data-resize="p-iching"></div>
+  </section>
 </main>
 
 <div id="stage">
@@ -423,7 +459,8 @@ const state={
   alerts:[], link:{failed:false},
   spark:{}, sparkCtx:{}, connectedAt:0, startedAt:Date.now(), firstPlayAt:0,
   beatDirty:{conductor:false,sentinel:false},
-  hold:{active:false,bar:0}, sv:'move'
+  hold:{active:false,bar:0}, sv:'move',
+  iching:null   // last cast hexagram {lines,present,relating,ts,active}
 };
 for(const b of BUSES){ state.buses[b]={m:0,trim:0,layers:0}; state.spark[b]=new Array(SPARK_LEN).fill(0); }
 
@@ -515,12 +552,14 @@ function handle(ev){
       if(ev.phase==='start'||ev.phase==='armed'){
         state.move={name:ev.name||'move',active:true,dry:!!ev.dry,bars:0,of:ev.bars||(ev.schedule&&ev.schedule.total)||0,
           touching:ev.touching||[],skipped:ev.skipped||[],next:ev.next||'',schedule:ev.schedule||null};
+        if(ev.iching){ state.iching={...ev.iching,ts:Date.now(),active:true}; renderIching(); }
         if(ev.skipped&&ev.skipped.length) pushAlert('sentry',(ev.name||'move')+' skipped: '+ev.skipped.join(', '));
       } else if(ev.phase==='cleanslate'){
         state.move={name:'CLEAN SLATE',active:true,dry:!!ev.dry,bars:0,of:0,touching:[],skipped:[],next:'',schedule:null};
         setTimeout(()=>handle({t:'move',phase:'idle'}),2500);
       } else if(ev.phase==='end'||ev.phase==='idle'||ev.phase==='superseded'){
         if(!ev.next) state.move={name:'idle',active:false,dry:false,bars:0,of:0,touching:[],skipped:[],next:'',schedule:null};
+        if(state.iching&&state.iching.active){ state.iching.active=false; renderIching(); }
       } break;
     }
     case 'ramp': state.move.bars=ev.bars; if(ev.of) state.move.of=ev.of; break;
@@ -707,6 +746,22 @@ function paint(){
   if(state.alerts.length) renderAlerts();
 }
 
+function renderIching(){
+  const ic=state.iching, card=$('ichingCard'), empty=$('ichingEmpty');
+  if(!ic){ if(card) card.style.display='none'; if(empty) empty.style.display=''; return; }
+  empty.style.display='none'; card.style.display='';
+  $('p-iching').classList.toggle('spent',!ic.active);
+  // lines bottom-to-top; flex column-reverse stacks them visually correct (top line on top)
+  $('ichingLines').innerHTML=ic.lines.map(l=>{
+    const cls='ln'+(l.changing?' changing':'');
+    const bar='bar '+(l.yang?'yang':'yin');
+    return `<div class="${cls}"><span class="mk">${l.changing?'◇':''}</span><div class="${bar}"><span></span>${l.yang?'':'<span></span>'}</div></div>`;
+  }).join('');
+  const p=ic.present;
+  $('ichingPresent').innerHTML=`<span class="gly">${p.upperGlyph}${p.lowerGlyph}</span>${p.n}<span class="nm">${escapeHtml(p.name||'')}</span>`;
+  if(ic.relating){ $('ichingRelating').innerHTML=`changing toward <b>${ic.relating.n} · ${escapeHtml(ic.relating.name||'')}</b> ${ic.relating.upperGlyph}${ic.relating.lowerGlyph}`; }
+  else $('ichingRelating').innerHTML='<span style="color:var(--dim)">no changing lines — a settled reading</span>';
+}
 function renderStage(mv,pct,hrDb){
   $('sBeat').textContent=$('beat').textContent; $('sBar').textContent=$('barn').textContent; $('sTempo').textContent=$('tempo').textContent;
   for(const [src,id] of [['conductor','sHcond'],['sentinel','sHsent']]){ const node=$(id); const live=$(src==='conductor'?'hcond':'hsent');

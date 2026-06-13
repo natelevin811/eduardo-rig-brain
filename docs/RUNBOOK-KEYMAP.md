@@ -37,6 +37,7 @@ last cleanly — e.g. `SEQ RISE 16 > CLEAN SLATE > BLOOM 16`.
 | `VEIL` | 8 | — | Send **F (Hangup)** swells hard on Pads+Leads — a smeared freeze-wash — then dissolves on the way back down. |
 | `SWELL` | 16 | **letter** | `SWELL B` — single-send bloom across Pads/Leads/Perc. Arg is a return letter `A`–`F`. |
 | `PULSE` | 16 | — | Transport-synced sine on send D across Perc+Leads, 1-bar period, depth low. Felt, not heard. Ends exactly on the captured value. |
+| `ICHING` | 24 | — | **Off by default** — cast a hexagram, rendered in the 7777 window, that gently colors the space. See §6. Bounded, reversible, ABORT-able. |
 
 Every move **captures** the current value of each parameter before it moves it
 and returns to *that* value, not an assumed default — so it always honors
@@ -108,7 +109,36 @@ the move has to exist in the library above. New moves are code, not clip names.
 
 ---
 
-## 5. Ableton key map
+## 6. The I Ching cast (`ICHING`) — optional, safe, killable
+
+A bit of chance you can invite in and throw out. **It does nothing unless you
+create a clip named `ICHING`** — there is no automatic casting and nothing fires
+on its own.
+
+When you launch it, the rig casts a hexagram the classical way (three-coin
+method, six lines bottom-to-top, with changing lines) and:
+
+- **Renders the hexagram in the dashboard** (the `i ching` panel on
+  `localhost:7777`): the six lines drawn solid (yang) or broken (yin), changing
+  lines marked `◇`, the King Wen number + name and trigram glyphs, and the
+  *relating* hexagram it's changing toward. The reading lingers (dimmed) after
+  the gesture ends.
+- **Plays a bounded gesture** derived from the cast: each yang line gives its bus
+  a small, capped send swell; yin lines are stillness; changing lines add one
+  slow, barely-there shimmer. Over the move's bars it swells, then **returns
+  every send to where your hands had it.**
+
+Why it's safe to use at the gig:
+
+- It's a normal move, so it inherits *everything* — grabs only during the ramp,
+  range sentries skip anything you're holding, capture-and-restore, and the Link
+  contract (it only touches conductor-owned sends; never tempo/transport/scenes).
+- The depths are hard-capped small — a "sour" reading is never more than a wash.
+- **If it goes anywhere you don't like, press `ABORT`** (or launch `CLEAN SLATE`):
+  the gesture ends instantly and every swelled send rolls back home.
+- It's off until you make the clip, and it doesn't change the room for anyone.
+
+## 7. Ableton key map
 
 No new MIDI mappings are required for any of this. Commands ride the session
 grid as labeled clips (Push 3 + both iPads), so your existing controller map is

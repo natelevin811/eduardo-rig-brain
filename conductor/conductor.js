@@ -20,7 +20,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13j cleanslate-sends';
+var BUILD = '2026-06-13k iching';
 (function () {
   var loc = '';
   try {
@@ -557,7 +557,8 @@ function startMove(step) {
   Telemetry.emit('move', {
     phase: 'start', name: S.activeMove.name, bars: built.bars,
     touching: laneLabels(lanes), skipped: skipped, next: seqNextName(), dry: S.dryRun ? 1 : 0,
-    schedule: buildSchedule(lanes, S.activeMove.events, built.bars)
+    schedule: buildSchedule(lanes, S.activeMove.events, built.bars),
+    iching: built.iching || null   // present only for the ICHING move (the cast hexagram)
   });
   dbg('MOVE ' + S.activeMove.name + ' @ beat ' + startBeat + (S.dryRun ? ' [DRY-RUN]' : ''));
 }
