@@ -20,7 +20,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13i track-id-pin';
+var BUILD = '2026-06-13j cleanslate-sends';
 (function () {
   var loc = '';
   try {
@@ -59,6 +59,9 @@ var S = {
   slots: [],             // grab pool: slots[i] = paramId or 0
   alive: { targets: [], suspended: false },
   shepRest: null,        // ShephardsTone Output macro value at load (CLEAN SLATE target)
+  displaced: {},         // id -> {info, captured}: every param a move pulled off
+                         // its pre-move home. CLEAN SLATE / ABORT roll these back;
+                         // releasing a grab alone only freezes a send where it sits.
   initRetries: 0         // load-race resolution retries (see end of _init)
 };
 
@@ -530,6 +533,15 @@ function startMove(step) {
     var slot = S.dryRun ? -2 : (S.apiDrive ? -3 : slotAcquire(info.id));
     lanes.push({ info: info, label: targetLabel(bl.target), captured: captured,
                  segs: segs, laneBars: cum, slot: slot, noRestore: !!bl.noRestore, done: false });
+    // book the pre-move home of every param we displace, keyed by id and only
+    // ONCE — a SEQ / supersede chain that re-captures mid-move must not forget
+    // the original, so CLEAN SLATE rolls all the way back, not just to the last
+    // intermediate. Held noRestore displacements (NIGHTFALL, DISSOLVE) stay on
+    // the book until CLEAN SLATE. Sends have no fixed rest, so this is the only
+    // record of where the hands had them.
+    if (!S.dryRun && !S.displaced.hasOwnProperty(info.id)) {
+      S.displaced[info.id] = { info: info, captured: captured };
+    }
   }
 
   S.activeMove = {
@@ -739,6 +751,12 @@ function _sync(beats) {
         driveLane(lane, v);        // land exactly on the endpoint
         slotRelease(lane.slot);    // grab only during ramps — release immediately
         lane.done = true;
+        // a normal lane's last segment lands back on captured — it's home, so
+        // strike it from the displaced book. A noRestore lane (held by design)
+        // stays booked for CLEAN SLATE to undo.
+        if (!lane.noRestore && S.displaced.hasOwnProperty(lane.info.id)) {
+          delete S.displaced[lane.info.id];
+        }
       } else {
         driveLane(lane, v);
       }
@@ -829,6 +847,21 @@ function runCleanSlate() {
   if (S.dryRun) { Telemetry.emit('move', { phase: 'cleanslate', dry: 1 }); return; }
 
   var name, i;
+  // FIRST: roll every conductor-displaced param back to where the hands had it
+  // before we touched it. Releasing the grab above only freezes a displaced send
+  // where it sits — this is what returns the return-F sends home (rig 2026-06-13:
+  // CLEAN SLATE left them up while the panel read idle). The fixed-rest snaps
+  // below then override this for the buses/macros that HAVE a rest; sends, which
+  // don't, are returned home here. nDisp reported so the panel shows it worked.
+  var nDisp = 0;
+  for (name in S.displaced) {
+    if (S.displaced.hasOwnProperty(name)) {
+      setParamRaw(S.displaced[name].info, S.displaced[name].captured);
+      nDisp++;
+    }
+  }
+  S.displaced = {};
+
   for (name in REG.clTrack) {
     if (REG.clTrack.hasOwnProperty(name)) Resolver.call(REG.clTrack[name], 'stop_all_clips');
   }
@@ -853,8 +886,9 @@ function runCleanSlate() {
   if (REG.shepmacro && S.shepRest !== null) {
     setParamRaw(REG.shepmacro, S.shepRest); // Output macro back where hands left it
   }
-  Telemetry.emit('move', { phase: 'cleanslate' });
-  dbg('CLEAN SLATE executed');
+  Telemetry.emit('move', { phase: 'cleanslate', restored: nDisp });
+  if (nDisp > 0) Telemetry.alert('cleanslate', 'rolled ' + nDisp + ' displaced param(s) home (incl. sends)');
+  dbg('CLEAN SLATE executed — ' + nDisp + ' displaced params rolled home');
 }
 
 function setParamRaw(info, v) {
