@@ -20,7 +20,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13k iching';
+var BUILD = '2026-06-13l cmd-poll';
 (function () {
   var loc = '';
   try {
@@ -296,6 +296,14 @@ function _init() {
       REG.firedObserver.property = 'fired_slot_index';
     }
     REG.cmdObserverId = ctId;
+    // poll baseline: on this rig the slot-index observers above silently never
+    // fire (same machine where is_playing must be polled). pollCommandSlots in
+    // clockTick reads these slots and synthesizes the missed callback; seed the
+    // baseline to NOW so an already-armed clip at load isn't replayed as a press.
+    REG.lastSeenPlaying = parseInt(REG.cmdObserver.get('playing_slot_index'), 10);
+    if (isNaN(REG.lastSeenPlaying)) REG.lastSeenPlaying = -1;
+    REG.lastSeenFired = parseInt(REG.firedObserver.get('fired_slot_index'), 10);
+    if (isNaN(REG.lastSeenFired)) REG.lastSeenFired = -1;
   }
 
   // --- transport observer (read-only: we listen, we never speak) ---------------
@@ -376,6 +384,7 @@ function onPlayingSlot(args) {
     if (String(args[0]) !== 'playing_slot_index') return;
     var slotIdx = parseInt(args[1], 10);
     if (isNaN(slotIdx) || slotIdx < 0 || !S.ready) return;
+    REG.lastSeenPlaying = slotIdx; // keep the poll baseline in step (dedup vs pollCommandSlots)
     var clip = new LiveAPI(REG.conductorTrackPath + ' clip_slots ' + slotIdx + ' clip');
     var name = String(clip.get('name'));
     var parsed = parseCommand(name);
@@ -398,6 +407,7 @@ function onFiredSlot(args) {
     if (String(args[0]) !== 'fired_slot_index') return;
     var idx = parseInt(args[1], 10);
     if (isNaN(idx) || idx < 0 || !S.ready || !REG.cmdObserver) return;
+    REG.lastSeenFired = idx; // keep the poll baseline in step (dedup vs pollCommandSlots)
     var cur = parseInt(REG.cmdObserver.get('playing_slot_index'), 10);
     if (idx !== cur) return; // normal launch — the playing_slot_index handler owns it
     dbg('command retrigger on slot ' + idx + ' — re-arming');
@@ -673,11 +683,49 @@ function clockTick() {
         onIsPlaying(['is_playing', p ? 1 : 0]);
       }
     }
+    // command-slot reconcile (rig 2026-06-13: after a device reload the
+    // playing_slot_index / fired_slot_index observers silently never fired —
+    // every command-clip press went unseen, the move name stuck on 'idle'
+    // though the engine, clock and grab pool were all fine). Same fix as the
+    // is_playing poll above: read the slot indices ~7 Hz and synthesize the
+    // missed observer callback. READ-only (.get) — Link-safe; id-pinned path —
+    // position-proof. Deduped against the real observer via REG.lastSeen*.
+    CLOCK.slotPolls = (CLOCK.slotPolls || 0) + 1;
+    if (CLOCK.slotPolls >= 4) { CLOCK.slotPolls = 0; pollCommandSlots(); }
     if (nowMs() - CLOCK.lastExtSyncMs < 500) return; // plugsync~ chain alive — defer
     if (!REG.liveSet) return;
     var b = parseFloat(REG.liveSet.get('current_song_time'));
     if (!isNaN(b)) _sync(b);
   });
+}
+
+// Poll the CONDUCTOR track's launch slots and synthesize the observer callback
+// the runtime dropped (see clockTick). Mirrors the observer dispatch exactly:
+// a change in playing_slot_index is a fresh command; a change in fired_slot_index
+// while it equals the playing slot is a retrigger. Updating REG.lastSeen* both
+// here and inside the real handlers means whichever path sees a change first
+// records it and the other no-ops — so this is safe even where the observer works.
+function pollCommandSlots() {
+  if (!S.ready || !REG.cmdObserver || !REG.firedObserver) return;
+  var playing = parseInt(REG.cmdObserver.get('playing_slot_index'), 10);
+  if (isNaN(playing)) playing = -1;
+  var fired = parseInt(REG.firedObserver.get('fired_slot_index'), 10);
+  if (isNaN(fired)) fired = -1;
+  if (playing !== REG.lastSeenPlaying) {
+    REG.lastSeenPlaying = playing;
+    if (playing >= 0) {
+      dbg('command seen via poll: playing_slot ' + playing + ' — observer missed it');
+      onPlayingSlot(['playing_slot_index', playing]);
+      return; // dispatched this tick; let the next tick reconcile fired_slot_index
+    }
+  }
+  if (fired !== REG.lastSeenFired) {
+    REG.lastSeenFired = fired;
+    if (fired >= 0 && fired === playing) {
+      dbg('command retrigger seen via poll: fired_slot ' + fired);
+      onFiredSlot(['fired_slot_index', fired]);
+    }
+  }
 }
 
 // TRUST GATE (perf machine 2026-06-12): plugsync~ outlet maps differ between
