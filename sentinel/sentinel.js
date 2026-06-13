@@ -788,7 +788,8 @@ function nightarc(v) {
 // full protective law returns: soft knee + full LoDrums/Bass clamps.
 function lighttouch(v) {
   jailRun('lighttouch', function () {
-    S.lightTouch = parseInt(v, 10) === 1;
+    S.lightTouch = (v === undefined || v === null || String(v) === 'bang')
+      ? !S.lightTouch : (parseInt(v, 10) === 1); // bare press (button bang) toggles
     uiOut('lighttouch', S.lightTouch ? 1 : 0);
     Telemetry.emit('lighttouch', { on: S.lightTouch ? 1 : 0, kickBassClampDb: LIGHT_TOUCH.kickBassClampDb });
     dbg('LIGHT TOUCH ' + (S.lightTouch ? 'ON — gentle; faders own kick/bass' : 'OFF — full protective law'));

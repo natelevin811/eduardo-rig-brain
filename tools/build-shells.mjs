@@ -288,12 +288,16 @@ function addFaceControls(B, js, controls, x, y) {
       B.connect(m, 0, js, 0);
     } else {
       // toggle: live.text mode 1 = Toggle -> [message $1(
+      const initAttr = (c.initial !== undefined)
+        ? { saved_attribute_attributes: { valueof: { parameter_initial_enable: 1, parameter_initial: [c.initial] } } }
+        : {};
       const tg = B.box('live.text', null, cx, cy, 1, 2, {
         varname: c.varname || 'ctl_' + i,
         text: c.label,
         mode: 1, // Toggle
         parameter_enable: 1,
         ...ann,
+        ...initAttr,
         ...pres,
       });
       const m = B.msg(c.message + ' $1', cx, cy + 40);
@@ -383,6 +387,10 @@ function buildSentinel(patcher) {
         annotation: 'REHEARSE: chatty, auto-RITUAL, full telemetry. SHOW: quiet, rate-capped, nothing automatic.' },
       { kind: 'toggle', label: 'DRY-RUN', message: 'dryrun', varname: 'ctl_dryrun',
         annotation: 'Compute and display headroom trims but write nothing into Live. Rehearse the guard silently.' },
+      { kind: 'toggle', label: 'PANIC', message: 'panic', varname: 'ctl_panic',
+        annotation: 'EMERGENCY OFF. Zeros every SENTRIM trim and halts the control law until you toggle it back. Use if the sentinel fights you mid-set.' },
+      { kind: 'toggle', label: 'LIGHT', message: 'lighttouch', varname: 'ctl_lighttouch', initial: 1,
+        annotation: 'Light-touch mode (default ON): gentle, only acts past the ceiling, near-zero on kick/bass. Toggle off for the full protective law.' },
     ],
     60,
     1050
