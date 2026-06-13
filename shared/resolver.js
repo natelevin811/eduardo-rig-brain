@@ -46,8 +46,25 @@ var Resolver = (function () {
   }
 
   function getMissing() { return missing.slice(0); }
-  function clearMissing() { missing = []; }
+  function clearMissing() { missing = []; trackIdx = null; }
   function setOnMissing(fn) { onMissing = fn; }
+
+  // track-name index — built once per resolution pass and reused, so RITUAL/init
+  // don't re-scan the whole (large) set on every track() call. That synchronous
+  // per-call LiveAPI churn on Live's main thread is what beachballs Live during
+  // RITUAL on the 104 MB set (rig 2026-06-13): ~20 track() lookups x N tracks.
+  // Cleared per pass (clearMissing / clearTrackCache). track()/tracksMatching
+  // still return FRESH handles by index, so callers never share a mutable one.
+  var trackIdx = null;
+  function clearTrackCache() { trackIdx = null; }
+  function buildTrackIdx() {
+    trackIdx = [];
+    var ls = new LiveAPI('live_set');
+    var n = ls.getcount('tracks');
+    for (var i = 0; i < n; i++) {
+      trackIdx.push({ name: apiName(new LiveAPI('live_set tracks ' + i)), i: i });
+    }
+  }
 
   // ---- setmap loading ----------------------------------------------------------
   // Reads a JSON file from Max's search path.
@@ -78,11 +95,9 @@ var Resolver = (function () {
 
   // Find a regular track by exact name. Returns LiveAPI or null (noted).
   function track(name) {
-    var ls = new LiveAPI('live_set');
-    var n = ls.getcount('tracks');
-    for (var i = 0; i < n; i++) {
-      var t = new LiveAPI('live_set tracks ' + i);
-      if (apiName(t) === name) return t;
+    if (!trackIdx) buildTrackIdx();
+    for (var k = 0; k < trackIdx.length; k++) {
+      if (trackIdx[k].name === name) return new LiveAPI('live_set tracks ' + trackIdx[k].i);
     }
     noteMissing('track', name, 'no track with this name');
     return null;
@@ -90,12 +105,10 @@ var Resolver = (function () {
 
   // Find all tracks whose name contains a substring (RITUAL pattern matches only).
   function tracksMatching(substr) {
+    if (!trackIdx) buildTrackIdx();
     var out = [];
-    var ls = new LiveAPI('live_set');
-    var n = ls.getcount('tracks');
-    for (var i = 0; i < n; i++) {
-      var t = new LiveAPI('live_set tracks ' + i);
-      if (apiName(t).indexOf(substr) !== -1) out.push(t);
+    for (var k = 0; k < trackIdx.length; k++) {
+      if (trackIdx[k].name.indexOf(substr) !== -1) out.push(new LiveAPI('live_set tracks ' + trackIdx[k].i));
     }
     return out;
   }
@@ -275,6 +288,7 @@ var Resolver = (function () {
     beatsPerBar: beatsPerBar,
     getMissing: getMissing,
     clearMissing: clearMissing,
+    clearTrackCache: clearTrackCache,
     setOnMissing: setOnMissing,
     noteMissing: noteMissing
   };

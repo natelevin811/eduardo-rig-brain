@@ -22,7 +22,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13p 5hz-quiet';
+var BUILD = '2026-06-13q ritual-fast';
 (function () {
   var loc = '';
   try {
@@ -612,6 +612,7 @@ function _ritual() {
     _init();
     if (!S.ready) { Telemetry.alert('ritual', 'sentinel not initialized'); return; }
   }
+  Resolver.clearTrackCache(); // rescan the set once; reused across all the fixes below
   var fixed = [], failed = [], i;
 
   function fix(label, fn) {
