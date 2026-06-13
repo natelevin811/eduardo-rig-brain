@@ -151,6 +151,17 @@ for (const d of DOCS) {
     const absDir = join(ROOT, d.dir);
     if (!existsSync(absDir)) { console.warn('skip (missing dir): ' + d.dir); continue; }
     cpSync(absDir, join(OUT, d.slug), { recursive: true });
+    // The copied index.html links its assets RELATIVELY (e.g. <img src="WASH_16.svg">).
+    // With cleanUrls + trailingSlash:false the page serves at /<slug> (no trailing
+    // slash), so those would resolve against root and 404. Pin them with a <base>
+    // so every relative URL resolves under /<slug>/ regardless of trailing slash.
+    const idxPath = join(OUT, d.slug, 'index.html');
+    if (existsSync(idxPath)) {
+      let html = readFileSync(idxPath, 'utf8');
+      if (!/<base[\s>]/i.test(html))
+        html = html.replace(/<head>/i, '<head><base href="/' + d.slug + '/">');
+      writeFileSync(idxPath, html);
+    }
     published.push({ ...d, slug: d.slug + '/' });   // trailing slash -> directory
     console.log('copied /' + d.slug + '/  <-  ' + d.dir + '/');
     continue;
