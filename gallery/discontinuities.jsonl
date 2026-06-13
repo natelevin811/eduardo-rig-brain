@@ -1,0 +1,6 @@
+{"command":"BLOOM 16","kind":"snap","atBars":0,"deltaNorm":0.85,"note":"instant jump (bar-aligned snap) — intended for macro LPF"}
+{"command":"RISE 16","kind":"snap","atBars":16,"deltaNorm":1,"note":"instant jump (bar-aligned snap) — intended for KnobRiser"}
+{"command":"SUNRISE 32","kind":"snap","atBars":0,"deltaNorm":0.4,"note":"instant jump (bar-aligned snap) — intended for macro HPF"}
+{"command":"SUNRISE 32","kind":"snap","atBars":0,"deltaNorm":0.55,"note":"instant jump (bar-aligned snap) — intended for macro LPF"}
+{"command":"SEQ RISE 16 > CLEAN SLATE > BLOOM 16","kind":"snap","atBars":16,"deltaNorm":1,"note":"instant jump (bar-aligned snap) — intended for KnobRiser"}
+{"command":"SEQ RISE 16 > CLEAN SLATE > BLOOM 16","kind":"snap","atBars":18.0001,"deltaNorm":0.85,"note":"instant jump (bar-aligned snap) — intended for macro LPF"}

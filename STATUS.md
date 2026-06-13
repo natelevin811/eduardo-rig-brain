@@ -1,4 +1,32 @@
-# STATUS.md — build status (updated 2026-06-13, post show_4 batch)
+# STATUS.md — build status (updated 2026-06-13)
+
+## 🌙 OVERNIGHT BACKLOG TOOLS (2026-06-13) — see docs/BACKLOG-TOOLS.md
+
+Built all four backlog tools in Nate's order, against the real v6.als + .hss.
+All offline + read-only; Link-safety grep clean (no tempo/transport/scene
+writes, no Live API surface). Committed with generated example outputs.
+
+- **Set Linter** (`tools/lint_set.py`) — parses any .als, 13 checks. On v6:
+  **1 RED** (11 enabled-tempo scenes = Link hazard), 9 YELLOW (incl. a hidden
+  −6.11 dB Utility on CL#3 BASS, All-Ins leaks on synth chains 17/18/19,
+  external/old-volume media). Pre-commit gate in `.githooks/` +
+  `tools/install-hooks.sh`. Sample run: `out/lint-report.txt` / `.jsonl`.
+- **Helix Bank Tools** (`tools/helix_bank.py`) — `audit`/`card`/`diff` on the
+  .hss (47 presets). Audit flags Tweed +5 dB, GD-ORGAN +4 dB, Cavernous −6 dB,
+  cab +6 dB jumps, one muted path. Card: `out/helix-card.html` (print for stand).
+- **Move Gallery** (`tools/move_gallery.mjs`) — renders every move from the real
+  moves.js through the conductor.js ramp math to SVG (`gallery/`). 6 intended
+  snaps, **0 zipper risks**. `gallery/index.html` = contact sheet.
+- **The Weaver** (`weaver/`) — headless MIDI companion sim ONLY (no live device;
+  living-room rule). Scale-locked, plays-less-when-you-play-more, companion
+  ratio ~0.2–0.5. Audition `weaver/audition/together.mid`. README in `weaver/`.
+
+Needs human hands: ears on the Weaver audition + a real Push take; visual
+once-over of the Helix card grouping; decide per-scene on the 11 baked tempos;
+point Helix `diff` at the old bank to confirm 2019 imports. The two stage
+devices below are unchanged by this work.
+
+---
 
 ## 2026-06-13 — show_4 batch (build `2026-06-13k iching`)
 
@@ -35,8 +63,6 @@ tests pass.
   contract all apply and **ABORT/CLEAN SLATE kill it instantly**. Does nothing
   until a clip is named `ICHING`. **Rig test (low priority):** make an ICHING
   clip, launch it, confirm the hexagram renders and ABORT rolls the sends home.
-
-## 2026-06-13 — CONDUCTOR track is now position-proof (build `2026-06-13i`)
 
 ## 2026-06-13 — CONDUCTOR track is now position-proof (build `2026-06-13i`)
 

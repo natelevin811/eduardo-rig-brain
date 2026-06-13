@@ -3,7 +3,7 @@
 //
 // This is doc hosting only — it touches nothing in the rig. The Max devices,
 // the resolver, and the Link contract are unaffected by anything in here.
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, cpSync, existsSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { marked } from 'marked';
@@ -32,7 +32,15 @@ const DOCS = [
   { src: 'docs/SHELL-BUILD.md', slug: 'shell-build', title: 'Shell build',
     blurb: 'Building the Max device shells and prepping the Live set.', tag: 'build' },
   { src: 'STATUS.md', slug: 'status', title: 'Build status',
-    blurb: 'The living status log — what is done, untested, and needs human hands.', tag: 'log' }
+    blurb: 'The living status log — what is done, untested, and needs human hands.', tag: 'log' },
+  { src: 'docs/BACKLOG-TOOLS.md', slug: 'backlog-tools', title: 'Backlog tools',
+    blurb: 'The overnight tools: Set Linter, Helix bank audit/card, Move Gallery, Weaver sim — what they found on the real set.', tag: 'tools' },
+  { src: 'weaver/README.md', slug: 'weaver', title: 'The Weaver',
+    blurb: 'The MIDI-only generative companion — simulator scaffold only, and the rules that keep it a companion not a soloist.', tag: 'tools' },
+  { src: 'out/helix-card.html', slug: 'helix-card', title: 'Helix bank card', raw: true,
+    blurb: 'The printable music-stand card: preset names, colour chips, snapshot maps, grouped bass→guitar→ambient.', tag: 'artifact' },
+  { dir: 'gallery', slug: 'move-gallery', title: 'Move Gallery',
+    blurb: 'Every conductor move + sequence rendered as a curve picture from the real ramp engine — the design-by-looking surface.', tag: 'artifact' }
 ];
 
 const STYLE = `
@@ -137,6 +145,16 @@ mkdirSync(OUT, { recursive: true });
 
 const published = [];
 for (const d of DOCS) {
+  // artifact directory (e.g. the Move Gallery + its SVGs): copy whole tree to
+  // site/<slug>/, the card links to /<slug>/ (serves its index.html).
+  if (d.dir) {
+    const absDir = join(ROOT, d.dir);
+    if (!existsSync(absDir)) { console.warn('skip (missing dir): ' + d.dir); continue; }
+    cpSync(absDir, join(OUT, d.slug), { recursive: true });
+    published.push({ ...d, slug: d.slug + '/' });   // trailing slash -> directory
+    console.log('copied /' + d.slug + '/  <-  ' + d.dir + '/');
+    continue;
+  }
   const abs = join(ROOT, d.src);
   if (!existsSync(abs)) { console.warn('skip (missing): ' + d.src); continue; }
   if (d.raw) {

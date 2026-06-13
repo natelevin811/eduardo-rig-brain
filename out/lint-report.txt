@@ -1,0 +1,43 @@
+
+SET LINTER  —  eduardo_v6.als
+  51 tracks, 959 scenes
+  1 RED   9 YELLOW   20 ok
+
+FAILURES (RED):
+  RED    scene_tempos         11 scenes carry an ENABLED tempo (89/98/106/110/114/115/120/121) — LINK HAZARD: launching one re-tempos the whole room. Disable the tempo on these scenes or never launch them by accident.
+
+WARNINGS (YELLOW):
+  YELLOW duplicate_names      [CptrPercMidi] track name 'CptrPercMidi' appears 2 times — name-based resolution is ambiguous for it
+  YELLOW external_media       2313 media refs under 'Exported from Antares' (e.g. /Users/natelevin/Music/Ableton/Exported from Antares Laptop/6.3.0_Aug23_nolivelooping Project/Samples/Imported/TribalPaceKicks02_100-2.wav) — confirm these are collected/available on the gig laptop
+  YELLOW external_media       126 media refs under '/Volumes/' (e.g. /Volumes/NateAT/2025-06-26-194057.previous/Data/Applications/Ableton Live 11 Suite.app.Old/Contents/App-Resources/Core Library/Devices/Audio Effects/Utility) — confirm these are collected/available on the gig laptop
+  YELLOW lane_gains           [CL#3 BASS] Utility 'Utility' on CL lane at -6.11 dB (second gain stage)
+  YELLOW midi_from_leaks      [17 Bss Chain] MIDI-From = All Ins on an instrument chain (scope to one port)
+  YELLOW midi_from_leaks      [18 Pad Chain] MIDI-From = All Ins on an instrument chain (scope to one port)
+  YELLOW midi_from_leaks      [19 Leads Chain] MIDI-From = All Ins on an instrument chain (scope to one port)
+  YELLOW midi_from_leaks      [WhiteNoise] MIDI-From = All Ins on an instrument chain (scope to one port)
+  YELLOW midi_from_leaks      [42-ShephardsTone] MIDI-From = All Ins on an instrument chain (scope to one port)
+
+PASSED (GREEN):
+  GREEN  bus_faders           [LoDrumsBus] -3.45 dB
+  GREEN  bus_faders           [HiDrumsBus] -7.54 dB
+  GREEN  bus_faders           [PercBus] -4.71 dB
+  GREEN  bus_faders           [BassBus] -4.39 dB
+  GREEN  bus_faders           [PadsBus] -4.39 dB
+  GREEN  bus_faders           [LeadsBus] -7.23 dB
+  GREEN  dj_filters           [LoDrumsBus] centered (0.000)
+  GREEN  dj_filters           [HiDrumsBus] centered (-0.000)
+  GREEN  dj_filters           [PercBus] centered (-0.000)
+  GREEN  dj_filters           [BassBus] centered (0.000)
+  GREEN  dj_filters           [PadsBus] centered (-0.000)
+  GREEN  dj_filters           [LeadsBus] centered (-0.000)
+  GREEN  eq_three             [6 Melodies] all bands at unity
+  GREEN  midi_from_leaks      [8-Drum Rack] MIDI-From = All Ins (no instrument; low risk)
+  GREEN  midi_from_leaks      [15 Sound Healing] MIDI-From = All Ins (no instrument; low risk)
+  GREEN  midi_from_leaks      [16 Perc 2] MIDI-From = All Ins (no instrument; low risk)
+  GREEN  midi_from_leaks      [Kapture] MIDI-From = All Ins (no instrument; low risk)
+  GREEN  midi_from_leaks      [CONDUCTOR] MIDI-From = All Ins (no instrument; low risk)
+  GREEN  plugins              Omnisphere ×5 (authorized)
+  GREEN  plugins              ValhallaVintageVerb ×1 (authorized)
+
+wrote 30 findings -> out/lint-findings.jsonl
+RED findings present — set is NOT clean.
