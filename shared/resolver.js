@@ -77,19 +77,12 @@ var Resolver = (function () {
   }
 
   // Find a regular track by exact name. Returns LiveAPI or null (noted).
-  // Returns an ID-PINNED handle, not the index-path one we searched with: an
-  // index path ("live_set tracks 3") names a SLOT, so a cached handle — or any
-  // observer built on it — silently follows whoever later slides into that slot
-  // when the set is reordered (rig 2026-06-13: dragging CONDUCTOR to track 20
-  // killed its command observer). An id is assigned once and follows the object
-  // to any position, which is exactly the by-name religion this resolver exists
-  // to enforce. byName() finds it; byId pins it.
   function track(name) {
     var ls = new LiveAPI('live_set');
     var n = ls.getcount('tracks');
     for (var i = 0; i < n; i++) {
       var t = new LiveAPI('live_set tracks ' + i);
-      if (apiName(t) === name) return new LiveAPI('id ' + t.id);
+      if (apiName(t) === name) return t;
     }
     noteMissing('track', name, 'no track with this name');
     return null;
@@ -112,7 +105,7 @@ var Resolver = (function () {
     var n = ls.getcount('return_tracks');
     for (var i = 0; i < n; i++) {
       var t = new LiveAPI('live_set return_tracks ' + i);
-      if (apiName(t) === name) return new LiveAPI('id ' + t.id); // id-pinned (see track())
+      if (apiName(t) === name) return t;
     }
     noteMissing('return', name, 'no return track with this name');
     return null;
