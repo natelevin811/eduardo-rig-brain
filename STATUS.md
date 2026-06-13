@@ -1,4 +1,4 @@
-# STATUS.md — build status (updated 2026-06-13, overnight backlog tools)
+# STATUS.md — build status (updated 2026-06-13)
 
 ## 🌙 OVERNIGHT BACKLOG TOOLS (2026-06-13) — see docs/BACKLOG-TOOLS.md
 
@@ -27,6 +27,65 @@ point Helix `diff` at the old bank to confirm 2019 imports. The two stage
 devices below are unchanged by this work.
 
 ---
+
+## 2026-06-13 — show_4 batch (build `2026-06-13k iching`)
+
+Worked the last on-rig note list. All committed on `claude/bold-cori-wtmsw1`
+(draft PR #18). Link grep re-proven clean (raw api.set/call only inside
+Resolver); ES5 clean (comment-stripped check); node --check passes; King Wen
+table verified a clean 1–64 permutation; dashboard JS + renderIching smoke
+tests pass.
+
+- **CLEAN SLATE now rolls displaced sends home** (the reported bug: "clean
+  slate didnt roll down all the F sends; commands running while it says idle").
+  Root cause: releasing a grab only *freezes* a displaced send; CLEAN SLATE
+  snapped known params to rest but sends had no rest entry, and a held VEIL/
+  NIGHTFALL displacement had no memory. Fix: a per-param displaced book
+  (`S.displaced`) booked once at move start, struck when a lane lands home,
+  rolled back (to the pre-move hands value) by CLEAN SLATE/ABORT before the
+  fixed-rest snaps. The still-audible send WAS the "running while idle." **Rig
+  test:** run a VEIL (send F) or BLOOM, hit CLEAN SLATE mid-move, confirm the
+  sends return to where your hands had them and the panel reads idle = silence.
+- **Dashboard:** conductor readout shows the **bar number (1-indexed "bar 3/8")**
+  instead of a percentage; **SHOW mode auto-declutters** (hides Log/Copy/Layout/
+  Reset + the alerts scrollback; the stale-heartbeat/link red banner stays);
+  the **classic UI is no longer a trap** — a "→ New UI" link + `\` toggles back.
+- **`docs/RUNBOOK-KEYMAP.md`** — one page: every command clip, both device
+  faces, dashboard hotkeys, and the move/rename answer (move the track anywhere
+  = id-pinned; move clips between scenes freely = name-keyed; rename to any
+  VALID command — the name IS the command; unknown names no-op, never misfire).
+- **`docs/EXPLAINER.html`** — a stylized, self-contained artifact of what the
+  rig does, with the failure-recovery "war stories" front and center.
+- **I CHING (`ICHING` move) — OFF BY DEFAULT.** Cast a hexagram, render it in
+  the 7777 window (new `i ching` panel: lines, changing marks, King Wen number/
+  name, relating hexagram), and play a hard-capped, fully reversible send
+  gesture from the cast. It's a normal move, so grabs/sentries/restore/Link
+  contract all apply and **ABORT/CLEAN SLATE kill it instantly**. Does nothing
+  until a clip is named `ICHING`. **Rig test (low priority):** make an ICHING
+  clip, launch it, confirm the hexagram renders and ABORT rolls the sends home.
+
+## 2026-06-13 — CONDUCTOR track is now position-proof (build `2026-06-13i`)
+
+Eduardo dragged the CONDUCTOR track to track 20 and commands went dead. Root
+cause: name resolution was already position-independent, but `Resolver.track`
+handed back a LiveAPI pinned to the **index path** (`live_set tracks N`) it
+searched with — an index path names a SLOT, so the cached handle and the
+command observers built on it silently followed whoever slid into the old slot
+after the reorder. Fix, at the bottom of the stack so the whole rig inherits
+it: `Resolver.track`/`returnTrack` now return an **id-pinned** handle
+(`new LiveAPI('id ' + t.id)`), which follows the named object to any position.
+`conductor.js` also binds its `playing_slot_index`/`fired_slot_index` observers
+and every clip-slot access by `'id ' + ct.id`, and rebinds if the track's id
+changes (delete+recreate). So: **move CONDUCTOR anywhere — by name it works.**
+No need to move it back. Sentinel bus-meter reads inherit the same id-pinning.
+Link grep re-proven (raw api.set/call only inside Resolver.set/call); ES5 clean;
+`node --check` passes. UNVERIFIED on rig: confirm a pad press registers after a
+live reorder (drag CONDUCTOR, launch WASH 16). Out-there ideas → GitHub backlog.
+
+Dashboard: DJ-filter rows got a bipolar **deflection fill** (a bar from the
+center detent out to the dot) so each hand-ridden filter's direction + amount
+reads at a glance instead of a lone floating dot. Read-only telemetry, no rig
+risk. Hard-refresh `localhost:7777` to pick it up.
 
 ## ⏭ NEXT TEST (Eduardo, at the laptop — single most important thing)
 

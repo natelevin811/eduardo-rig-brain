@@ -20,7 +20,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13h loop-viz';
+var BUILD = '2026-06-13k iching';
 (function () {
   var loc = '';
   try {
@@ -59,6 +59,9 @@ var S = {
   slots: [],             // grab pool: slots[i] = paramId or 0
   alive: { targets: [], suspended: false },
   shepRest: null,        // ShephardsTone Output macro value at load (CLEAN SLATE target)
+  displaced: {},         // id -> {info, captured}: every param a move pulled off
+                         // its pre-move home. CLEAN SLATE / ABORT roll these back;
+                         // releasing a grab alone only freezes a send where it sits.
   initRetries: 0         // load-race resolution retries (see end of _init)
 };
 
@@ -257,10 +260,28 @@ function _init() {
   // --- CONDUCTOR command track ------------------------------------------------
   // observers created once and guarded: a resolution RETRY re-runs _init and a
   // second observer on the same property would double-fire every command.
+  //
+  // POSITION-PROOF (rig 2026-06-13: Eduardo dragged CONDUCTOR to track 20 and
+  // commands went dead): bind the observers and every clip-slot access by the
+  // track's canonical ID, never by its index path. An index path like
+  // "live_set tracks 19" names a SLOT, not the track — reorder the set and that
+  // path now points at whoever slid into slot 19, so the command observer
+  // silently watches the wrong track and every pad press goes unseen. The id is
+  // assigned once and follows the object to any position. Resolution is already
+  // by name; this makes the whole command surface move-anywhere.
   var ct = Resolver.track('CONDUCTOR');
   if (ct) {
     REG.conductorTrack = ct;
-    REG.conductorTrackPath = ct.unquotedpath || ct.path.replace(/"/g, '');
+    var ctId = String(ct.id);
+    REG.conductorTrackId = ctId;
+    REG.conductorTrackPath = 'id ' + ctId; // id-rooted: LiveAPI follows the object
+    // If the track was deleted + recreated (or otherwise swapped to a new id)
+    // since we last bound, tear the stale observers down so they rebind below —
+    // a guard that only checks existence would leave them watching a dead id.
+    if (REG.cmdObserverId && REG.cmdObserverId !== ctId) {
+      if (REG.cmdObserver) { REG.cmdObserver.property = ''; REG.cmdObserver = null; }
+      if (REG.firedObserver) { REG.firedObserver.property = ''; REG.firedObserver = null; }
+    }
     if (!REG.cmdObserver) {
       REG.cmdObserver = new LiveAPI(onPlayingSlot, REG.conductorTrackPath);
       REG.cmdObserver.property = 'playing_slot_index';
@@ -274,6 +295,7 @@ function _init() {
       REG.firedObserver = new LiveAPI(onFiredSlot, REG.conductorTrackPath);
       REG.firedObserver.property = 'fired_slot_index';
     }
+    REG.cmdObserverId = ctId;
   }
 
   // --- transport observer (read-only: we listen, we never speak) ---------------
@@ -511,6 +533,15 @@ function startMove(step) {
     var slot = S.dryRun ? -2 : (S.apiDrive ? -3 : slotAcquire(info.id));
     lanes.push({ info: info, label: targetLabel(bl.target), captured: captured,
                  segs: segs, laneBars: cum, slot: slot, noRestore: !!bl.noRestore, done: false });
+    // book the pre-move home of every param we displace, keyed by id and only
+    // ONCE — a SEQ / supersede chain that re-captures mid-move must not forget
+    // the original, so CLEAN SLATE rolls all the way back, not just to the last
+    // intermediate. Held noRestore displacements (NIGHTFALL, DISSOLVE) stay on
+    // the book until CLEAN SLATE. Sends have no fixed rest, so this is the only
+    // record of where the hands had them.
+    if (!S.dryRun && !S.displaced.hasOwnProperty(info.id)) {
+      S.displaced[info.id] = { info: info, captured: captured };
+    }
   }
 
   S.activeMove = {
@@ -526,7 +557,8 @@ function startMove(step) {
   Telemetry.emit('move', {
     phase: 'start', name: S.activeMove.name, bars: built.bars,
     touching: laneLabels(lanes), skipped: skipped, next: seqNextName(), dry: S.dryRun ? 1 : 0,
-    schedule: buildSchedule(lanes, S.activeMove.events, built.bars)
+    schedule: buildSchedule(lanes, S.activeMove.events, built.bars),
+    iching: built.iching || null   // present only for the ICHING move (the cast hexagram)
   });
   dbg('MOVE ' + S.activeMove.name + ' @ beat ' + startBeat + (S.dryRun ? ' [DRY-RUN]' : ''));
 }
@@ -720,6 +752,12 @@ function _sync(beats) {
         driveLane(lane, v);        // land exactly on the endpoint
         slotRelease(lane.slot);    // grab only during ramps — release immediately
         lane.done = true;
+        // a normal lane's last segment lands back on captured — it's home, so
+        // strike it from the displaced book. A noRestore lane (held by design)
+        // stays booked for CLEAN SLATE to undo.
+        if (!lane.noRestore && S.displaced.hasOwnProperty(lane.info.id)) {
+          delete S.displaced[lane.info.id];
+        }
       } else {
         driveLane(lane, v);
       }
@@ -810,6 +848,21 @@ function runCleanSlate() {
   if (S.dryRun) { Telemetry.emit('move', { phase: 'cleanslate', dry: 1 }); return; }
 
   var name, i;
+  // FIRST: roll every conductor-displaced param back to where the hands had it
+  // before we touched it. Releasing the grab above only freezes a displaced send
+  // where it sits — this is what returns the return-F sends home (rig 2026-06-13:
+  // CLEAN SLATE left them up while the panel read idle). The fixed-rest snaps
+  // below then override this for the buses/macros that HAVE a rest; sends, which
+  // don't, are returned home here. nDisp reported so the panel shows it worked.
+  var nDisp = 0;
+  for (name in S.displaced) {
+    if (S.displaced.hasOwnProperty(name)) {
+      setParamRaw(S.displaced[name].info, S.displaced[name].captured);
+      nDisp++;
+    }
+  }
+  S.displaced = {};
+
   for (name in REG.clTrack) {
     if (REG.clTrack.hasOwnProperty(name)) Resolver.call(REG.clTrack[name], 'stop_all_clips');
   }
@@ -834,8 +887,9 @@ function runCleanSlate() {
   if (REG.shepmacro && S.shepRest !== null) {
     setParamRaw(REG.shepmacro, S.shepRest); // Output macro back where hands left it
   }
-  Telemetry.emit('move', { phase: 'cleanslate' });
-  dbg('CLEAN SLATE executed');
+  Telemetry.emit('move', { phase: 'cleanslate', restored: nDisp });
+  if (nDisp > 0) Telemetry.alert('cleanslate', 'rolled ' + nDisp + ' displaced param(s) home (incl. sends)');
+  dbg('CLEAN SLATE executed — ' + nDisp + ' displaced params rolled home');
 }
 
 function setParamRaw(info, v) {

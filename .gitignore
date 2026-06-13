@@ -2,6 +2,8 @@ logs/*.jsonl
 .DS_Store
 node_modules/
 .gstack/
+site/
+.vercel/
 
 # Large / private binary set + bank files used as dev fixtures. Never committed;
 # the tools take a path argument and run against whatever you point them at.
