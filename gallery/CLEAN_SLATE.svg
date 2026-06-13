@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="320" viewBox="0 0 720 320" font-family="JetBrains Mono, ui-monospace, monospace">
+<rect width="720" height="320" fill="#15130f"/>
+<line x1="54" y1="290" x2="570" y2="290" stroke="#2a261f"/>
+<text x="46" y="293" fill="#7c756a" font-size="10" text-anchor="end">0.0</text>
+<line x1="54" y1="162" x2="570" y2="162" stroke="#2a261f"/>
+<text x="46" y="165" fill="#7c756a" font-size="10" text-anchor="end">0.5</text>
+<line x1="54" y1="34" x2="570" y2="34" stroke="#2a261f"/>
+<text x="46" y="37" fill="#7c756a" font-size="10" text-anchor="end">1.0</text>
+<line x1="54" y1="34" x2="54" y2="290" stroke="#211e18"/>
+<text x="54" y="308" fill="#7c756a" font-size="10" text-anchor="middle">0</text>
+<text x="54" y="20" fill="#f3ead9" font-size="14" font-weight="700">CLEAN SLATE</text>
+<text x="570" y="20" fill="#7c756a" font-size="10" text-anchor="end">0 bars @ 94 BPM · y = normalized 0..1</text>
+<text x="54" y="318" fill="#c2622a" font-size="10">immediate: stopAllClLanes, clFadersToZeroDb, centerDjFilters, macrosToRest, killRiser, shepToRest, releaseAllGrabs</text>
+</svg>
