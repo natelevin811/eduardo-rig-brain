@@ -22,7 +22,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13n light-touch';
+var BUILD = '2026-06-13o light-touch+panic';
 (function () {
   var loc = '';
   try {
@@ -68,6 +68,7 @@ var S = {
   dryRun: false,
   nightArcOn: false,
   lightTouch: true,      // gig default — see LIGHT_TOUCH above; resets ON each load
+  bypassed: false,       // panic: control law halted + trims zeroed until resume
   frozen: false,         // transport stopped → sentinel freezes
   beatsPerBar: 4,
   nowBeats: 0,
@@ -306,10 +307,14 @@ function tick() {
   }
 
   // 3) control law (frozen on transport stop — trims hold, nothing moves)
-  if (!S.frozen && !JAIL.disabled) controlLaw(mainMeter);
+  if (!S.frozen && !JAIL.disabled && !S.bypassed) controlLaw(mainMeter);
 
-  // 4) capture-sanity watcher every 500 ms
-  if (tickCount % 5 === 0) captureSanity();
+  // 4) capture-sanity watcher — REHEARSE-only, every 2 s. It creates LOM
+  // objects per playing CL lane; running it at 10 Hz during playback was a
+  // main-thread stutter source (rig 2026-06-13: Live UI hitched, cleared when
+  // SENTINEL was removed). It's evidence/logging, never control — so SHOW
+  // skips it entirely and REHEARSE runs it lazily.
+  if (S.mode !== 'SHOW' && tickCount % 20 === 0) captureSanity();
 
   // 4b) drive watchdog every 1 s: verify the last trim write actually landed.
   // remote~ vals from Task context vanish on this runtime; API sets land.
@@ -787,6 +792,46 @@ function lighttouch(v) {
     uiOut('lighttouch', S.lightTouch ? 1 : 0);
     Telemetry.emit('lighttouch', { on: S.lightTouch ? 1 : 0, kickBassClampDb: LIGHT_TOUCH.kickBassClampDb });
     dbg('LIGHT TOUCH ' + (S.lightTouch ? 'ON — gentle; faders own kick/bass' : 'OFF — full protective law'));
+  });
+}
+
+// zero every SENTRIM trim immediately (release grab + write 0 dB).
+function zeroAllTrims() {
+  for (var i = 0; i < S.buses.length; i++) {
+    var b = S.buses[i];
+    if (!b.trimInfo) continue;
+    b.trimDb = 0;
+    grabOff(b);
+    if (!S.dryRun) Resolver.set(Resolver.byId(b.trimInfo.id), 'value', 0);
+  }
+}
+
+// PANIC — emergency off. Zeros every trim and HALTS the control law until
+// resume. One-button safety: [panic] toggles; [panic 1]/[panic 0] set it
+// explicitly (a toggle live.text wired to `panic $1` latches it cleanly).
+// Not persisted — a re-drag also clears the bypass.
+function panic(v) {
+  jailRun('panic', function () {
+    var on = (v === undefined || v === null || String(v) === 'bang')
+      ? !S.bypassed : (parseInt(v, 10) === 1);
+    S.bypassed = on;
+    if (on) zeroAllTrims();
+    uiOut('bypassed', on ? 1 : 0);
+    Telemetry.emit('bypass', { on: on ? 1 : 0 });
+    Telemetry.alert('bypass', on ? 'SENTINEL BYPASSED — trims zeroed, control law halted'
+                                 : 'SENTINEL resumed — control law active');
+    dbg(on ? 'PANIC: trims zeroed + control law halted (send resume / panic 0 to re-arm)'
+           : 'RESUMED: control law active');
+  });
+}
+function resume() { panic(0); }
+
+// reset trims to 0 WITHOUT disabling the sentinel (it keeps protecting).
+function resettrims() {
+  jailRun('resettrims', function () {
+    zeroAllTrims();
+    Telemetry.alert('reset', 'SENTRIM trims reset to 0');
+    dbg('SENTRIM trims reset to 0 (control law still active)');
   });
 }
 
