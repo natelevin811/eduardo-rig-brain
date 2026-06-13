@@ -1,4 +1,27 @@
-# STATUS.md — build status (updated 2026-06-12, post first-rig-test fixes)
+# STATUS.md — build status (updated 2026-06-13, post track-move fix)
+
+## 2026-06-13 — CONDUCTOR track is now position-proof (build `2026-06-13i`)
+
+Eduardo dragged the CONDUCTOR track to track 20 and commands went dead. Root
+cause: name resolution was already position-independent, but `Resolver.track`
+handed back a LiveAPI pinned to the **index path** (`live_set tracks N`) it
+searched with — an index path names a SLOT, so the cached handle and the
+command observers built on it silently followed whoever slid into the old slot
+after the reorder. Fix, at the bottom of the stack so the whole rig inherits
+it: `Resolver.track`/`returnTrack` now return an **id-pinned** handle
+(`new LiveAPI('id ' + t.id)`), which follows the named object to any position.
+`conductor.js` also binds its `playing_slot_index`/`fired_slot_index` observers
+and every clip-slot access by `'id ' + ct.id`, and rebinds if the track's id
+changes (delete+recreate). So: **move CONDUCTOR anywhere — by name it works.**
+No need to move it back. Sentinel bus-meter reads inherit the same id-pinning.
+Link grep re-proven (raw api.set/call only inside Resolver.set/call); ES5 clean;
+`node --check` passes. UNVERIFIED on rig: confirm a pad press registers after a
+live reorder (drag CONDUCTOR, launch WASH 16). Out-there ideas → GitHub backlog.
+
+Dashboard: DJ-filter rows got a bipolar **deflection fill** (a bar from the
+center detent out to the dot) so each hand-ridden filter's direction + amount
+reads at a glance instead of a lone floating dot. Read-only telemetry, no rig
+risk. Hard-refresh `localhost:7777` to pick it up.
 
 ## ⏭ NEXT TEST (Eduardo, at the laptop — single most important thing)
 

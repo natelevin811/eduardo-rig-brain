@@ -165,9 +165,13 @@
   #djLegend b { color:var(--teal); font-weight:500; }
   .djrow { display:flex; align-items:center; gap:10px; }
   .djrow .dn { width:64px; font-size:11px; color:var(--dim); flex:0 0 auto; }
-  .djtrack { flex:1; height:14px; border-radius:8px; background:#0a0806; position:relative; box-shadow:inset 0 1px 2px rgba(0,0,0,.5); }
-  .djctr { position:absolute; top:-3px; bottom:-3px; left:50%; width:2px; background:var(--dim2); transform:translateX(-1px); }
-  .djdot { position:absolute; top:50%; width:12px; height:12px; border-radius:50%; transform:translate(-50%,-50%);
+  .djtrack { flex:1; height:14px; border-radius:8px; background:#0a0806; position:relative; box-shadow:inset 0 1px 2px rgba(0,0,0,.5); overflow:hidden; }
+  /* bipolar deflection fill: grows from the center detent out to the dot, so
+     each filter's direction + amount reads in one glance instead of a lone dot */
+  .djfill { position:absolute; top:0; bottom:0; background:var(--amber-d); opacity:.5; transition:left .12s, width .12s, background .2s; }
+  .djfill.centered { background:var(--teal-d); }
+  .djctr { position:absolute; top:-3px; bottom:-3px; left:50%; width:2px; background:var(--dim2); transform:translateX(-1px); z-index:1; }
+  .djdot { position:absolute; top:50%; width:12px; height:12px; border-radius:50%; transform:translate(-50%,-50%); z-index:2;
            background:var(--amber); box-shadow:0 0 8px 1px rgba(224,162,63,.5); transition:left .12s, background .2s; }
   .djdot.centered { background:var(--teal); box-shadow:0 0 8px 1px rgba(70,168,158,.55); }
   .djrow .dv { width:62px; text-align:right; font-size:11px; color:var(--txt2); flex:0 0 auto; }
@@ -429,9 +433,11 @@ const djRows=$('djRows'), stageDj=$('stageDj');
 for(const b of BUSES){
   for(const host of [djRows,stageDj]){
     const r=document.createElement('div'); r.className='djrow';
-    r.innerHTML=`<span class="dn">${SHORT[b]}</span><div class="djtrack"><div class="djctr"></div>
-      <div class="djdot" id="${host===djRows?'dj':'sdj'}-${b}"></div></div>
-      <span class="dv" id="${host===djRows?'djv':'sdjv'}-${b}">—</span>`;
+    const pfx=host===djRows?'dj':'sdj';
+    r.innerHTML=`<span class="dn">${SHORT[b]}</span><div class="djtrack">
+      <div class="djfill" id="${pfx}f-${b}"></div><div class="djctr"></div>
+      <div class="djdot" id="${pfx}-${b}"></div></div>
+      <span class="dv" id="${pfx==='dj'?'djv':'sdjv'}-${b}">—</span>`;
     host.appendChild(r);
   }
 }
@@ -614,12 +620,20 @@ function renderLegend(){
 
 // ---- DJ rows render ----
 function renderDj(prefix){
-  const c=state.dj.center;
+  const c=state.dj.center, cpct=c*100;
   for(const b of BUSES){
-    const v=state.dj.buses[b]; const dot=$(prefix+'-'+b), val=$((prefix==='dj'?'djv':'sdjv')+'-'+b);
-    if(v==null){ if(dot) dot.style.left='50%'; if(val){ val.textContent='—'; val.classList.remove('centered'); } continue; }
+    const v=state.dj.buses[b];
+    const dot=$(prefix+'-'+b), fill=$(prefix+'f-'+b), val=$((prefix==='dj'?'djv':'sdjv')+'-'+b);
+    if(v==null){
+      if(dot){ dot.style.left='50%'; dot.classList.remove('centered'); }
+      if(fill){ fill.style.left=cpct+'%'; fill.style.width='0%'; }
+      if(val){ val.textContent='—'; val.classList.remove('centered'); }
+      continue;
+    }
     const centered=Math.abs(v-c)<=0.02;
-    if(dot){ dot.style.left=(v*100)+'%'; dot.classList.toggle('centered',centered); }
+    const pct=Math.max(0,Math.min(100,v*100));
+    if(dot){ dot.style.left=pct+'%'; dot.classList.toggle('centered',centered); }
+    if(fill){ const lo=Math.min(pct,cpct); fill.style.left=lo+'%'; fill.style.width=Math.abs(pct-cpct)+'%'; fill.classList.toggle('centered',centered); }
     if(val){ const off=Math.round((v-c)*200); val.textContent=centered?'center':(off>0?'+':'')+off+'%'; val.classList.toggle('centered',centered); }
   }
 }
