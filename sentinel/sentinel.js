@@ -22,7 +22,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13a cold-open-recovery';
+var BUILD = '2026-06-13f api-fallback';
 (function () {
   var loc = '';
   try {
@@ -294,6 +294,28 @@ function tick() {
   // 4) capture-sanity watcher every 500 ms
   if (tickCount % 5 === 0) captureSanity();
 
+  // 4b) drive watchdog every 1 s: verify the last trim write actually landed.
+  // remote~ vals from Task context vanish on this runtime; API sets land.
+  if (!S.apiDrive && !S.dryRun && tickCount % 10 === 0) {
+    for (var wdI = 0; wdI < S.buses.length; wdI++) {
+      var wdB = S.buses[wdI];
+      if (!wdB || !wdB.grabbed || wdB.lastSent === undefined || wdB.lastSent === null) continue;
+      var wdV = parseFloat(Resolver.byId(wdB.trimInfo.id).get('value'));
+      if (!isNaN(wdV) && Math.abs(wdV - wdB.lastSent) > 0.5) {
+        S.trimMisses = (S.trimMisses || 0) + 1;
+        if (S.trimMisses >= 2) {
+          S.apiDrive = true;
+          releaseAllGrabs();
+          dbg('DRIVE FALLBACK: SENTRIM remote~ writes not landing — api.set engaged');
+          Telemetry.alert('drive', 'SENTRIM remote~ writes NOT LANDING — switched to direct API drive');
+        }
+      } else if (!isNaN(wdV)) {
+        S.trimMisses = 0;
+      }
+      break; // first grabbed bus is evidence enough
+    }
+  }
+
   // 5) telemetry — SHOW caps this to 4 Hz inside Telemetry
   var meters = { main: round3(mainMeter), ceiling: S.ceiling, buses: {} };
   for (i = 0; i < S.buses.length; i++) {
@@ -395,8 +417,12 @@ function writeTrim(b) {
   if (S.dryRun) return;
   // SENTRIM is a Utility: Gain param is dB-native. Clamp to setmap law + param range.
   var v = Math.max(b.trimInfo.min, Math.min(b.trimInfo.max, Math.max(b.clampLow, Math.min(0, b.trimDb))));
+  // perf machine 2026-06-13: remote~ vals from Task context can silently
+  // vanish; the tick watchdog flips S.apiDrive and trims write via the API.
+  if (S.apiDrive) { Resolver.set(Resolver.byId(b.trimInfo.id), 'value', v); b.lastSent = v; return; }
   grabOn(b);
   outlet(0, [b.slot, 'val', v]);
+  b.lastSent = v;
 }
 
 function nightArcBiasDb() {
@@ -499,7 +525,8 @@ function sync(beats) {
     CLOCK.checkCount = 0;
     if (REG.liveSetClock) {
       var cst = parseFloat(REG.liveSetClock.get('current_song_time'));
-      if (!isNaN(cst)) CLOCK.extTrusted = Math.abs(beats - cst) <= 2;
+      // trust only decidable past beat 4 — see conductor.js sync()
+      if (!isNaN(cst)) CLOCK.extTrusted = (cst > 4) && (Math.abs(beats - cst) <= 2);
     }
     if (CLOCK.extTrusted !== trustedBefore) {
       dbg(CLOCK.extTrusted ? 'ext sync trusted — tracks song_time'

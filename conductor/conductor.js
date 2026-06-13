@@ -20,7 +20,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13e event-trace';
+var BUILD = '2026-06-13f api-fallback';
 (function () {
   var loc = '';
   try {
@@ -117,6 +117,18 @@ function slotAcquire(paramId) {
 function slotDrive(slot, v) {
   if (slot < 0) return;
   if (!S.dryRun) outlet(0, [slot, 'val', v]);
+}
+
+// Drive a lane through whichever path actually lands on this machine.
+// perf machine 2026-06-13: live.remote~ val messages sent from Task context
+// (the engine clock) silently vanish, while direct API sets land (proof:
+// RITUAL re-centers DJs from a Task via api.set every time). The per-bar
+// readback watchdog in _sync flips S.apiDrive when it catches values not
+// landing; from then on every lane drives via Resolver.set.
+function driveLane(lane, v) {
+  if (S.dryRun) return;
+  if (S.apiDrive) { Resolver.set(Resolver.byId(lane.info.id), 'value', v); return; }
+  slotDrive(lane.slot, v);
 }
 
 function slotRelease(slot) {
@@ -489,7 +501,7 @@ function startMove(step) {
       from = to;
       cum += sg.bars;
     }
-    var slot = S.dryRun ? -2 : slotAcquire(info.id);
+    var slot = S.dryRun ? -2 : (S.apiDrive ? -3 : slotAcquire(info.id));
     lanes.push({ info: info, label: targetLabel(bl.target), captured: captured,
                  segs: segs, laneBars: cum, slot: slot, noRestore: !!bl.noRestore, done: false });
   }
@@ -598,7 +610,11 @@ function sync(beats) {
     CLOCK.checkCount = 0;
     if (REG.liveSet) {
       var cst = parseFloat(REG.liveSet.get('current_song_time'));
-      if (!isNaN(cst)) CLOCK.extTrusted = Math.abs(beats - cst) <= 2;
+      // trust is only decidable past beat 4: near the song top, beats/480 and
+      // beats agree within tolerance and the wrong feed sneaks in (observed
+      // 2026-06-13: nowBeats=cst/480 with transport at 0.8). Below beat 4 the
+      // fallback poll (exact) owns the clock.
+      if (!isNaN(cst)) CLOCK.extTrusted = (cst > 4) && (Math.abs(beats - cst) <= 2);
     }
     if (CLOCK.extTrusted !== trustedBefore) {
       dbg(CLOCK.extTrusted ? 'ext sync trusted — tracks song_time'
@@ -649,11 +665,11 @@ function _sync(beats) {
       var v = laneValueAt(lane, bars);
       lane.lastV = v;
       if (bars >= lane.laneBars) {
-        slotDrive(lane.slot, v);   // land exactly on the endpoint
+        driveLane(lane, v);        // land exactly on the endpoint
         slotRelease(lane.slot);    // grab only during ramps — release immediately
         lane.done = true;
       } else {
-        slotDrive(lane.slot, v);
+        driveLane(lane, v);
       }
     }
 
@@ -663,6 +679,7 @@ function _sync(beats) {
     var dbgBar = Math.floor(bars);
     if (mv.dbgBar !== dbgBar) {
       mv.dbgBar = dbgBar;
+      var rbChecked = false;
       for (i = 0; i < mv.lanes.length; i++) {
         var ln = mv.lanes[i];
         if (ln.done) continue;
@@ -675,6 +692,25 @@ function _sync(beats) {
             ' v=' + (Math.round(ln.lastV * 1000) / 1000) +
             ' [' + ln.info.min + '..' + ln.info.max + ']' +
             ' cap=' + (Math.round(ln.captured * 1000) / 1000));
+        }
+        // readback watchdog (first live lane, once per bar, from bar 1): if the
+        // param ignored what we drove two bars running, the remote~ path is
+        // dead on this runtime — flip to direct API drive for everything.
+        if (!rbChecked && !S.apiDrive && !S.dryRun && dbgBar >= 1) {
+          rbChecked = true;
+          var rb = parseFloat(Resolver.byId(ln.info.id).get('value'));
+          if (!isNaN(rb) && Math.abs(rb - ln.lastV) > 0.10 * (ln.info.max - ln.info.min)) {
+            S.driveMisses = (S.driveMisses || 0) + 1;
+            if (S.driveMisses >= 2) {
+              S.apiDrive = true;
+              releaseAllGrabs();
+              dbg('DRIVE FALLBACK: remote~ vals not landing (read ' + rb + ' vs sent ' + ln.lastV + ') — api.set engaged');
+              Telemetry.alert('drive', 'remote~ values NOT LANDING (read ' + (Math.round(rb * 1000) / 1000) +
+                ' vs sent ' + (Math.round(ln.lastV * 1000) / 1000) + ') — switched to direct API drive');
+            }
+          } else if (!isNaN(rb)) {
+            S.driveMisses = 0;
+          }
         }
       }
     }
@@ -886,6 +922,7 @@ function grabtest() {
       ' clockTask=' + (CLOCK.task ? 'on' : 'OFF') +
       ' ready=' + (S.ready ? 1 : 0) +
       ' jailErrs=' + JAIL.total + (JAIL.disabled ? ' DISABLED' : '') +
+      ' drive=' + (S.apiDrive ? 'API' : 'remote~') +
       ' move=' + mvInfo;
     dbg(probe);
     Telemetry.alert('clockprobe', probe);
