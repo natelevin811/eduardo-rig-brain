@@ -1,0 +1,9 @@
+{"severity": "YELLOW", "slot": 6, "name": "Tweed BluesBrtWa", "message": "output +5.0 dB is +5.0 dB vs bank median \u2014 will jump out LOUDER", "data": {"max_output_db": 5.0, "delta": 5.0}}
+{"severity": "YELLOW", "slot": 7, "name": "Cavernous Clean '26", "message": "output -6.0 dB is -6.0 dB vs bank median \u2014 will jump out quieter", "data": {"max_output_db": -6.0, "delta": -6.0}}
+{"severity": "YELLOW", "slot": 25, "name": "!-S:Mlt.Gtr/Snth", "message": "output path OutputMatrix muted (-120 dB) \u2014 intentional dual-path, or dead?", "data": {"gain": -120.0, "model": "P35_OutputMatrix"}}
+{"severity": "YELLOW", "slot": 47, "name": "GD-ORGAN (1)", "message": "output +4.0 dB is +4.0 dB vs bank median \u2014 will jump out LOUDER", "data": {"max_output_db": 4.0, "delta": 4.0}}
+{"severity": "YELLOW", "slot": 2, "name": "Double Double", "message": "cab/IR level +6.0 dB is +6.0 dB vs cab median (0.0)", "data": {"cab_level_db": 6.0, "model": "HD2_CabMicIr_1x12USDeluxeWithPan"}}
+{"severity": "YELLOW", "slot": 15, "name": "Openly Squished (2)", "message": "cab/IR level +6.0 dB is +6.0 dB vs cab median (0.0)", "data": {"cab_level_db": 6.0, "model": "HD2_CabMicIr_1x8SmallTweedWithPan"}}
+{"severity": "YELLOW", "slot": 25, "name": "!-S:Mlt.Gtr/Snth", "message": "cab/IR level +6.0 dB is +6.0 dB vs cab median (0.0)", "data": {"cab_level_db": 6.0, "model": "HD2_CabMicIr_4x12Greenback25WithPan"}}
+{"severity": "YELLOW", "slot": 49, "name": "BssGtrHrmMinTUN8", "message": "cab/IR level +6.0 dB is +6.0 dB vs cab median (0.0)", "data": {"cab_level_db": 6.0, "model": "HD2_CabMicIr_8x10SVTAVWithPan"}}
+{"severity": "YELLOW", "slot": 50, "name": "BssGtrKrpDrnE-N8", "message": "cab/IR level +6.0 dB is +6.0 dB vs cab median (0.0)", "data": {"cab_level_db": 6.0, "model": "HD2_CabMicIr_8x10SVTAVWithPan"}}
