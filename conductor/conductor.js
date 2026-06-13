@@ -20,7 +20,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13b drive-trace-dash';
+var BUILD = '2026-06-13c move-probe';
 (function () {
   var loc = '';
   try {
@@ -775,6 +775,7 @@ function onIsPlaying(args) {
       S.seqQueue = [];
       S.pendingImmediate = null;
       Telemetry.emit('transport', { playing: 0 });
+      Telemetry.emit('move', { phase: 'idle' }); // clear the dashboard ghost too
     } else if (!S.isPlaying && playing) {
       Telemetry.emit('transport', { playing: 1 });
     }
@@ -840,12 +841,21 @@ function grabtest() {
     try { ip = String(new LiveAPI('live_set').get('is_playing')); } catch (e1) {}
     try { cst = String(new LiveAPI('live_set').get('current_song_time')); } catch (e2) {}
     var extAge = CLOCK.lastExtSyncMs ? (nowMs() - CLOCK.lastExtSyncMs) : -1;
+    var mvInfo = 'none';
+    if (S.activeMove) {
+      var mvSlots = [];
+      for (var mi = 0; mi < S.activeMove.lanes.length; mi++) mvSlots.push(S.activeMove.lanes[mi].slot);
+      mvInfo = S.activeMove.name + ' startBeat=' + S.activeMove.startBeat +
+        ' bars=' + (Math.round(((S.nowBeats - S.activeMove.startBeat) / S.beatsPerBar) * 100) / 100) +
+        '/' + S.activeMove.totalBars + ' slots=[' + mvSlots.join(',') + ']';
+    }
     var probe = 'clock probe [' + BUILD + ']: is_playing=' + ip + ' song_time=' + cst +
       ' nowBeats=' + S.nowBeats +
       ' extSync=' + (extAge < 0 ? 'never' : Math.round(extAge) + 'ms ago') +
       ' clockTask=' + (CLOCK.task ? 'on' : 'OFF') +
       ' ready=' + (S.ready ? 1 : 0) +
-      ' jailErrs=' + JAIL.total + (JAIL.disabled ? ' DISABLED' : '');
+      ' jailErrs=' + JAIL.total + (JAIL.disabled ? ' DISABLED' : '') +
+      ' move=' + mvInfo;
     dbg(probe);
     Telemetry.alert('clockprobe', probe);
 
