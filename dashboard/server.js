@@ -37,7 +37,7 @@ try {
 }
 
 // Ramp events are high-rate; thin them in the log file (full rate still hits the browser).
-const LOG_SKIP = { ramp: 4, meters: 8, clock: 8, hb: 4 };
+const LOG_SKIP = { ramp: 4, meters: 8, clock: 8, hb: 4, djstate: 4 };
 const logCounters = {};
 
 function logEvent(ev) {
