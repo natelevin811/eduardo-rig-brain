@@ -2,3 +2,5 @@ logs/*.jsonl
 .DS_Store
 node_modules/
 .gstack/
+site/
+.vercel/
