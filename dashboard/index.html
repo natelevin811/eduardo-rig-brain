@@ -176,7 +176,8 @@ for (const b of BUSES) {
       <div class="meterCol"><div class="meterFill" id="m-${b}"></div></div>
       <div class="spark"><canvas id="s-${b}"></canvas></div>
     </div>
-    <div><span class="trimVal" id="t-${b}">0.0</span> <span style="color:var(--dim);font-size:10px">dB</span>
+    <div><span style="color:var(--dim);font-size:9px;letter-spacing:.08em">SENTRIM</span>
+    <span class="trimVal" id="t-${b}">0.0</span> <span style="color:var(--dim);font-size:10px">dB</span>
     <span class="layers" id="l-${b}"></span></div>`;
   busesEl.appendChild(card);
   state.spark[b] = new Array(SPARK_LEN).fill(0);
@@ -309,7 +310,7 @@ function handle(ev) {
     }
     case 'trim': {
       // engage/release evidence lands in the log; surface engages briefly here
-      if (ev.phase === 'engage') pushAlert('trim', `${ev.bus} → ${ev.trim} dB (main ${ev.main}, hr ${ev.headroom})`);
+      if (ev.phase === 'engage') pushAlert('trim', `${ev.bus} → ${ev.trim} dB (main ${ev.main}, hr ${ev.headroom})${ev.dry ? ' (DRY-RUN — not written)' : ''}`);
       break;
     }
     case 'alert':         pushAlert(ev.kind || 'alert', ev.detail || ''); break;

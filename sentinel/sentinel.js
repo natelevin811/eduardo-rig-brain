@@ -22,7 +22,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13f api-fallback';
+var BUILD = '2026-06-13g trim-clarity';
 (function () {
   var loc = '';
   try {
@@ -384,7 +384,7 @@ function controlLaw(mainMeter) {
           Telemetry.emit('trim', { bus: b.name, phase: 'engage', trim: round2(b.trimDb),
                                    main: round3(mainMeter), busMeter: round3(b.meter),
                                    headroom: round2(headroomDb), layers: b.layers,
-                                   knee: headroomDb > 0 ? 1 : 0 });
+                                   knee: headroomDb > 0 ? 1 : 0, dry: S.dryRun ? 1 : 0 });
         }
         b.stableTicks = 0;
       }
