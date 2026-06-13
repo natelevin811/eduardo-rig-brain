@@ -22,7 +22,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-12d transport-poll';
+var BUILD = '2026-06-13a cold-open-recovery';
 (function () {
   var loc = '';
   try {
@@ -224,12 +224,17 @@ function _init() {
   // load race: M4L devices init while Live is still building the set — names
   // can be invisible on the first pass (seen on the rig 2026-06-12: SENTRIM and
   // HELIX Gain params unresolved at load). Retry; red text stays if real.
+  // load race: M4L devices init while Live is still building the set — on a
+  // COLD open every name misses and recovery must outlast minutes, not seconds.
   REG.initRetries = REG.initRetries || 0;
-  if (Resolver.getMissing().length > 0 && REG.initRetries < 3) {
+  var RETRY_DELAYS = [4, 4, 4, 8, 8, 15, 15, 30, 30, 60]; // seconds
+  if (Resolver.getMissing().length > 0 && REG.initRetries < RETRY_DELAYS.length) {
+    var retryDelay = RETRY_DELAYS[REG.initRetries];
     REG.initRetries++;
     REG.retryTask = new Task(function () { jailRun('init-retry', _init); }, this);
-    REG.retryTask.schedule(4000);
-    dbg('unresolved names — retrying resolution in 4s (attempt ' + REG.initRetries + '/3)');
+    REG.retryTask.schedule(retryDelay * 1000);
+    dbg('unresolved names — retrying resolution in ' + retryDelay + 's (attempt ' +
+        REG.initRetries + '/' + RETRY_DELAYS.length + '); RITUAL also re-resolves on demand');
   }
 }
 
@@ -537,7 +542,12 @@ function onIsPlaying(args) {
 function ritual() { jailRun('ritual', _ritual); }
 
 function _ritual() {
-  if (!S.ready) { Telemetry.alert('ritual', 'sentinel not initialized'); return; }
+  if (!S.ready || Resolver.getMissing().length > 0) {
+    // manual recovery: RITUAL re-runs resolution instead of demanding a re-drag
+    dbg('ritual: not ready / unresolved names — re-running resolution first');
+    _init();
+    if (!S.ready) { Telemetry.alert('ritual', 'sentinel not initialized'); return; }
+  }
   var fixed = [], failed = [], i;
 
   function fix(label, fn) {

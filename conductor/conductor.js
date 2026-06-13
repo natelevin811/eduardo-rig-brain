@@ -20,7 +20,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-12g drive-trace';
+var BUILD = '2026-06-13a cold-open-recovery';
 (function () {
   var loc = '';
   try {
@@ -283,11 +283,17 @@ function _init() {
   // names can be invisible on the first pass (seen on the rig 2026-06-12:
   // SENTRIM/HELIX params unresolved at load, fine minutes later). Retry a few
   // times; red text stays if it's genuinely missing.
-  if (Resolver.getMissing().length > 0 && S.initRetries < 3) {
+  // load race: M4L devices init while Live is still building the set, so some
+  // names can be invisible on the first pass — on a COLD open of the 104MB set
+  // every name misses and recovery must outlast minutes, not seconds.
+  var RETRY_DELAYS = [4, 4, 4, 8, 8, 15, 15, 30, 30, 60]; // seconds
+  if (Resolver.getMissing().length > 0 && S.initRetries < RETRY_DELAYS.length) {
+    var retryDelay = RETRY_DELAYS[S.initRetries];
     S.initRetries++;
     REG.retryTask = new Task(function () { jailRun('init-retry', _init); }, this);
-    REG.retryTask.schedule(4000);
-    dbg('unresolved names — retrying resolution in 4s (attempt ' + S.initRetries + '/3)');
+    REG.retryTask.schedule(retryDelay * 1000);
+    dbg('unresolved names — retrying resolution in ' + retryDelay + 's (attempt ' +
+        S.initRetries + '/' + RETRY_DELAYS.length + '); TEST also re-resolves on demand');
   }
 }
 
@@ -834,7 +840,13 @@ function grabtest() {
     dbg(probe);
     Telemetry.alert('clockprobe', probe);
 
-    if (!S.ready) { dbg('grabtest: not ready (init failed?)'); return; }
+    if (!S.ready || Resolver.getMissing().length > 0) {
+      // manual recovery: TEST re-runs resolution instead of demanding a re-drag
+      dbg('grabtest: not ready / unresolved names — re-running resolution now');
+      Telemetry.alert('resolve', 'TEST: re-running name resolution');
+      _init();
+      if (!S.ready || Resolver.getMissing().length > 0) return; // still broken — red text stands
+    }
     if (S.dryRun) { dbg('grabtest: DRY-RUN is ON — toggle it off to test real writes'); return; }
     if (GRABTEST.slot >= 0) { dbg('grabtest: already running — wait for it to finish'); return; }
     if (GRABTEST.running) { dbg('grabtest: probe sequence already running — wait ~4s'); return; }
