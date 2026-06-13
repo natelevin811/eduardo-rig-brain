@@ -1,0 +1,30 @@
+{"severity": "RED", "check": "scene_tempos", "track": null, "message": "11 scenes carry an ENABLED tempo (89/98/106/110/114/115/120/121) \u2014 LINK HAZARD: launching one re-tempos the whole room. Disable the tempo on these scenes or never launch them by accident.", "data": {"scenes": [{"index": 0, "name": "", "tempo": "89"}, {"index": 12, "name": "Cm - Niv Geju - Cm", "tempo": "98"}, {"index": 13, "name": "", "tempo": "98"}, {"index": 14, "name": "Fm", "tempo": "98"}, {"index": 27, "name": "Fm Singing Game Sabo", "tempo": "106"}, {"index": 55, "name": "Dm- Rosas - Vikan Arman - Em", "tempo": "110"}, {"index": 56, "name": "", "tempo": "114"}, {"index": 57, "name": "", "tempo": "114"}, {"index": 71, "name": "Dm Earth", "tempo": "115"}, {"index": 82, "name": "Gm Improv", "tempo": "120"}, {"index": 93, "name": "Gm Urpillay Bedouin", "tempo": "121"}]}}
+{"severity": "YELLOW", "check": "lane_gains", "track": "CL#3 BASS", "message": "Utility 'Utility' on CL lane at -6.11 dB (second gain stage)", "data": {"db": -6.11}}
+{"severity": "GREEN", "check": "bus_faders", "track": "LoDrumsBus", "message": "-3.45 dB", "data": {"db": -3.45}}
+{"severity": "GREEN", "check": "bus_faders", "track": "HiDrumsBus", "message": "-7.54 dB", "data": {"db": -7.54}}
+{"severity": "GREEN", "check": "bus_faders", "track": "PercBus", "message": "-4.71 dB", "data": {"db": -4.71}}
+{"severity": "GREEN", "check": "bus_faders", "track": "BassBus", "message": "-4.39 dB", "data": {"db": -4.39}}
+{"severity": "GREEN", "check": "bus_faders", "track": "PadsBus", "message": "-4.39 dB", "data": {"db": -4.39}}
+{"severity": "GREEN", "check": "bus_faders", "track": "LeadsBus", "message": "-7.23 dB", "data": {"db": -7.23}}
+{"severity": "GREEN", "check": "midi_from_leaks", "track": "8-Drum Rack", "message": "MIDI-From = All Ins (no instrument; low risk)", "data": {"instrument": false}}
+{"severity": "GREEN", "check": "midi_from_leaks", "track": "15 Sound Healing", "message": "MIDI-From = All Ins (no instrument; low risk)", "data": {"instrument": false}}
+{"severity": "GREEN", "check": "midi_from_leaks", "track": "16 Perc 2", "message": "MIDI-From = All Ins (no instrument; low risk)", "data": {"instrument": false}}
+{"severity": "YELLOW", "check": "midi_from_leaks", "track": "17 Bss Chain", "message": "MIDI-From = All Ins on an instrument chain (scope to one port)", "data": {"instrument": true}}
+{"severity": "YELLOW", "check": "midi_from_leaks", "track": "18 Pad Chain", "message": "MIDI-From = All Ins on an instrument chain (scope to one port)", "data": {"instrument": true}}
+{"severity": "YELLOW", "check": "midi_from_leaks", "track": "19 Leads Chain", "message": "MIDI-From = All Ins on an instrument chain (scope to one port)", "data": {"instrument": true}}
+{"severity": "YELLOW", "check": "midi_from_leaks", "track": "WhiteNoise", "message": "MIDI-From = All Ins on an instrument chain (scope to one port)", "data": {"instrument": true}}
+{"severity": "YELLOW", "check": "midi_from_leaks", "track": "42-ShephardsTone", "message": "MIDI-From = All Ins on an instrument chain (scope to one port)", "data": {"instrument": true}}
+{"severity": "GREEN", "check": "midi_from_leaks", "track": "Kapture", "message": "MIDI-From = All Ins (no instrument; low risk)", "data": {"instrument": false}}
+{"severity": "GREEN", "check": "midi_from_leaks", "track": "CONDUCTOR", "message": "MIDI-From = All Ins (no instrument; low risk)", "data": {"instrument": false}}
+{"severity": "GREEN", "check": "dj_filters", "track": "LoDrumsBus", "message": "centered (0.000)", "data": {}}
+{"severity": "GREEN", "check": "dj_filters", "track": "HiDrumsBus", "message": "centered (-0.000)", "data": {}}
+{"severity": "GREEN", "check": "dj_filters", "track": "PercBus", "message": "centered (-0.000)", "data": {}}
+{"severity": "GREEN", "check": "dj_filters", "track": "BassBus", "message": "centered (0.000)", "data": {}}
+{"severity": "GREEN", "check": "dj_filters", "track": "PadsBus", "message": "centered (-0.000)", "data": {}}
+{"severity": "GREEN", "check": "dj_filters", "track": "LeadsBus", "message": "centered (-0.000)", "data": {}}
+{"severity": "GREEN", "check": "eq_three", "track": "6 Melodies", "message": "all bands at unity", "data": {}}
+{"severity": "GREEN", "check": "plugins", "track": null, "message": "Omnisphere \u00d75 (authorized)", "data": {"plugin": "Omnisphere", "count": 5}}
+{"severity": "GREEN", "check": "plugins", "track": null, "message": "ValhallaVintageVerb \u00d71 (authorized)", "data": {"plugin": "ValhallaVintageVerb", "count": 1}}
+{"severity": "YELLOW", "check": "external_media", "track": null, "message": "2313 media refs under 'Exported from Antares' (e.g. /Users/natelevin/Music/Ableton/Exported from Antares Laptop/6.3.0_Aug23_nolivelooping Project/Samples/Imported/TribalPaceKicks02_100-2.wav) \u2014 confirm these are collected/available on the gig laptop", "data": {"hint": "Exported from Antares", "count": 2313, "example": "/Users/natelevin/Music/Ableton/Exported from Antares Laptop/6.3.0_Aug23_nolivelooping Project/Samples/Imported/TribalPaceKicks02_100-2.wav"}}
+{"severity": "YELLOW", "check": "external_media", "track": null, "message": "126 media refs under '/Volumes/' (e.g. /Volumes/NateAT/2025-06-26-194057.previous/Data/Applications/Ableton Live 11 Suite.app.Old/Contents/App-Resources/Core Library/Devices/Audio Effects/Utility) \u2014 confirm these are collected/available on the gig laptop", "data": {"hint": "/Volumes/", "count": 126, "example": "/Volumes/NateAT/2025-06-26-194057.previous/Data/Applications/Ableton Live 11 Suite.app.Old/Contents/App-Resources/Core Library/Devices/Audio Effects/Utility"}}
+{"severity": "YELLOW", "check": "duplicate_names", "track": "CptrPercMidi", "message": "track name 'CptrPercMidi' appears 2 times \u2014 name-based resolution is ambiguous for it", "data": {}}

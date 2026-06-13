@@ -2,3 +2,11 @@ logs/*.jsonl
 .DS_Store
 node_modules/
 .gstack/
+
+# Large / private binary set + bank files used as dev fixtures. Never committed;
+# the tools take a path argument and run against whatever you point them at.
+fixtures/*.als
+fixtures/*.hss
+fixtures/*.mid
+*.als
+*.hss

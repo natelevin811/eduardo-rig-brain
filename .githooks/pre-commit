@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# eduardo-rig-brain pre-commit hook — gates commits on a clean Set Linter run.
+#
+# It lints:
+#   1. every staged *.als (so committing a set runs the full audit), and
+#   2. an optional always-checked set named in env RIG_LINT_SET or in a file
+#      ".riglintset" at the repo root (one path per line) — useful when the set
+#      lives outside the repo / is gitignored.
+#
+# A RED finding aborts the commit. YELLOWs print but do not block.
+#
+# Opt out for a single commit:   git commit --no-verify
+# Opt out always:                RIG_LINT_SKIP=1 git commit ...
+#
+# Install with:  bash tools/install-hooks.sh
+set -euo pipefail
+
+if [ "${RIG_LINT_SKIP:-0}" = "1" ]; then
+  echo "rig-lint: skipped (RIG_LINT_SKIP=1)"
+  exit 0
+fi
+
+repo_root="$(git rev-parse --show-toplevel)"
+linter="$repo_root/tools/lint_set.py"
+if [ ! -f "$linter" ]; then
+  echo "rig-lint: linter not found at $linter — skipping"
+  exit 0
+fi
+
+python_bin="$(command -v python3 || command -v python || true)"
+if [ -z "$python_bin" ]; then
+  echo "rig-lint: no python found — skipping (install python3 to enable the gate)"
+  exit 0
+fi
+
+# collect sets to lint
+declare -a sets=()
+while IFS= read -r f; do
+  [ -n "$f" ] && sets+=("$repo_root/$f")
+done < <(git diff --cached --name-only --diff-filter=ACM | grep -i '\.als$' || true)
+
+if [ -n "${RIG_LINT_SET:-}" ]; then
+  sets+=("$RIG_LINT_SET")
+fi
+if [ -f "$repo_root/.riglintset" ]; then
+  while IFS= read -r line; do
+    [ -n "$line" ] && [ "${line#\#}" = "$line" ] && sets+=("$line")
+  done < "$repo_root/.riglintset"
+fi
+
+if [ "${#sets[@]}" -eq 0 ]; then
+  exit 0   # nothing set-shaped to lint; let the commit through
+fi
+
+fail=0
+for s in "${sets[@]}"; do
+  if [ ! -f "$s" ]; then
+    echo "rig-lint: set not found, skipping: $s"
+    continue
+  fi
+  echo "rig-lint: auditing $s"
+  if ! "$python_bin" "$linter" "$s" --quiet; then
+    fail=1
+  fi
+done
+
+if [ "$fail" -ne 0 ]; then
+  echo ""
+  echo "rig-lint: RED findings above — commit blocked."
+  echo "          fix them, or bypass with:  git commit --no-verify"
+  exit 1
+fi
+exit 0
