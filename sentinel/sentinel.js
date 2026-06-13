@@ -22,7 +22,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13o light-touch+panic';
+var BUILD = '2026-06-13p 5hz-quiet';
 (function () {
   var loc = '';
   try {
@@ -36,7 +36,9 @@ include("resolver.js");
 include("telemetry.js");
 
 var SETMAP_FILE = "eduardo-setmap.json";
-var TICK_MS = 100;            // 10 Hz control loop
+var TICK_MS = 200;            // 5 Hz control loop (was 10 Hz — halves LOM
+                             // polling to ease Live UI stutter; light-touch
+                             // only acts past the ceiling so 5 Hz is ample)
 var HISTORY_SECONDS = 60;     // sparkline depth
 
 // NIGHT ARC — optional governor, default OFF. ±2 dB total authority, expressed
@@ -268,7 +270,7 @@ function reportResolution() {
 }
 
 // ---------------------------------------------------------------------------
-// the loop — 10 Hz
+// the loop — 5 Hz (TICK_MS). PANIC/bypass short-circuits all heavy polling.
 // ---------------------------------------------------------------------------
 var tickCount = 0;
 
@@ -278,8 +280,26 @@ function tick() {
   if (!S.ready) return;
   tickCount++;
 
-  // 0) beat clock fallback — see sync() below (rig 2026-06-12)
+  // 0) beat clock fallback — see sync() below (rig 2026-06-12). Always runs so
+  // the heartbeat keeps pulsing even when bypassed.
   clockFallback();
+
+  // 0b) transport reconcile (perf machine 2026-06-12): the live_set is_playing
+  // observer can silently never fire on some machines — FROZEN then sticks and
+  // the control law never re-arms. Poll the same READ and synthesize the missed
+  // callback. Cheap; runs even when bypassed so re-arming is instant.
+  if (tickCount % 2 === 0) {
+    var tPlay = Resolver.readIsPlaying() === 1;
+    if (S.frozen !== !tPlay) {
+      dbg('transport ' + (tPlay ? 'started' : 'stopped') + ' seen via poll — observer missed it');
+      onIsPlaying(['is_playing', tPlay ? 1 : 0]);
+    }
+  }
+
+  // PANIC / bypass: emergency off. Skip ALL meter/census/control/capture LOM
+  // polling — that main-thread work is what stutters Live. Device stays alive
+  // (heartbeat above) and transport-aware; trims were zeroed in panic().
+  if (S.bypassed) return;
 
   // 1) meters
   var mainMeter = parseFloat(S.mainApi.get('output_meter_level'));
@@ -292,33 +312,21 @@ function tick() {
   }
 
   // 2) loop census every 2 s
-  if (tickCount % 20 === 0) census();
-
-  // 2b) transport reconcile (perf machine 2026-06-12): the live_set is_playing
-  // observer can silently never fire on some machines — FROZEN then sticks and
-  // the control law never re-arms. Poll the same READ at 2 Hz and synthesize
-  // the missed callback. Same philosophy as the clock trust gate.
-  if (tickCount % 5 === 0) {
-    var tPlay = Resolver.readIsPlaying() === 1;
-    if (S.frozen !== !tPlay) {
-      dbg('transport ' + (tPlay ? 'started' : 'stopped') + ' seen via poll — observer missed it');
-      onIsPlaying(['is_playing', tPlay ? 1 : 0]);
-    }
-  }
+  if (tickCount % 10 === 0) census();
 
   // 3) control law (frozen on transport stop — trims hold, nothing moves)
-  if (!S.frozen && !JAIL.disabled && !S.bypassed) controlLaw(mainMeter);
+  if (!S.frozen && !JAIL.disabled) controlLaw(mainMeter);
 
   // 4) capture-sanity watcher — REHEARSE-only, every 2 s. It creates LOM
   // objects per playing CL lane; running it at 10 Hz during playback was a
   // main-thread stutter source (rig 2026-06-13: Live UI hitched, cleared when
   // SENTINEL was removed). It's evidence/logging, never control — so SHOW
   // skips it entirely and REHEARSE runs it lazily.
-  if (S.mode !== 'SHOW' && tickCount % 20 === 0) captureSanity();
+  if (S.mode !== 'SHOW' && tickCount % 10 === 0) captureSanity();
 
   // 4b) drive watchdog every 1 s: verify the last trim write actually landed.
   // remote~ vals from Task context vanish on this runtime; API sets land.
-  if (!S.apiDrive && !S.dryRun && tickCount % 10 === 0) {
+  if (!S.apiDrive && !S.dryRun && tickCount % 5 === 0) {
     for (var wdI = 0; wdI < S.buses.length; wdI++) {
       var wdB = S.buses[wdI];
       if (!wdB || !wdB.grabbed || wdB.lastSent === undefined || wdB.lastSent === null) continue;
