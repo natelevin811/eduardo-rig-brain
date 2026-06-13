@@ -22,7 +22,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13g trim-clarity';
+var BUILD = '2026-06-13n light-touch';
 (function () {
   var loc = '';
   try {
@@ -48,12 +48,26 @@ var NIGHT_ARC = {
   maxBiasDb: -2.0   // hard cap, spec law
 };
 
+// LIGHT TOUCH — gig 2026-06-13, default ON at Eduardo's request. Two changes
+// from the protective default: (1) NO soft-knee — the sentinel only acts once
+// Main is genuinely PAST the ceiling, never pre-emptively in the headroom band;
+// (2) near-zero authority on LoDrums/Bass — the performer rides the kick and
+// bass by hand, so the sentinel barely touches them. Pads/Leads/Perc/HiDrums
+// keep full clamp so a stacked-loop runaway is still caught (just later, harder).
+// Trade-off acknowledged: protects the mix less; the faders are the backstop.
+// Toggle live with [lighttouch 0/1]; resets to ON on every (re)load.
+var LIGHT_TOUCH = {
+  on: true,
+  kickBassClampDb: -1.0  // most the sentinel may pull LoDrums/Bass in light mode
+};
+
 var S = {
   ready: false,
   setmap: null,
   mode: 'REHEARSE',
   dryRun: false,
   nightArcOn: false,
+  lightTouch: true,      // gig default — see LIGHT_TOUCH above; resets ON each load
   frozen: false,         // transport stopped → sentinel freezes
   beatsPerBar: 4,
   nowBeats: 0,
@@ -208,7 +222,10 @@ function _init() {
 
   S.ready = true;
   reportResolution();
-  Telemetry.emit('boot', { sub: 'sentinel', missing: Resolver.getMissing().length, mode: S.mode });
+  Telemetry.emit('boot', { sub: 'sentinel', missing: Resolver.getMissing().length, mode: S.mode,
+                           lightTouch: S.lightTouch ? 1 : 0 });
+  if (S.lightTouch) dbg('LIGHT TOUCH on: trims act only past ceiling; LoDrums/Bass capped at '
+                        + LIGHT_TOUCH.kickBassClampDb + ' dB');
 
   // pattr may have restored trims before we were ready — apply them now
   if (S.pendingTrims) { applyTrims(S.pendingTrims); S.pendingTrims = null; }
@@ -367,6 +384,13 @@ function controlLaw(mainMeter) {
     // census feedforward: layers stacked on this bus widen its knee — expect
     // the creep at 3 layers deep and meet it early instead of reacting late.
     var kneeTop = 3.0 + Math.min(1.5, 0.5 * Math.max(0, b.layers - 1));
+    // LIGHT TOUCH: kill the soft knee (act only past the ceiling) and hold
+    // near-zero authority on LoDrums/Bass. See LIGHT_TOUCH at top.
+    if (S.lightTouch) kneeTop = 0; // knee off → the soft-knee branch never fires
+    var effClamp = b.clampLow;
+    if (S.lightTouch && (b.name === 'LoDrumsBus' || b.name === 'BassBus')) {
+      effClamp = Math.max(b.clampLow, LIGHT_TOUCH.kickBassClampDb);
+    }
 
     var wantTrim = false, slew = 0;
     if (dom === b) {
@@ -376,7 +400,7 @@ function controlLaw(mainMeter) {
 
     if (wantTrim) {
       var before = b.trimDb;
-      b.trimDb = Math.max(b.clampLow, b.trimDb - slew);
+      b.trimDb = Math.max(effClamp, b.trimDb - slew);
       b.comfortTicks = 0;
       if (b.trimDb !== before) {
         writeTrim(b);
@@ -752,6 +776,17 @@ function nightarc(v) {
     S.nightArcOn = parseInt(v, 10) === 1;
     uiOut('nightarc', S.nightArcOn ? 1 : 0);
     Telemetry.emit('nightarc', { on: S.nightArcOn ? 1 : 0, bias: round2(nightArcBiasDb()) });
+  });
+}
+
+// LIGHT TOUCH toggle (default ON, resets ON each reload). When turned OFF the
+// full protective law returns: soft knee + full LoDrums/Bass clamps.
+function lighttouch(v) {
+  jailRun('lighttouch', function () {
+    S.lightTouch = parseInt(v, 10) === 1;
+    uiOut('lighttouch', S.lightTouch ? 1 : 0);
+    Telemetry.emit('lighttouch', { on: S.lightTouch ? 1 : 0, kickBassClampDb: LIGHT_TOUCH.kickBassClampDb });
+    dbg('LIGHT TOUCH ' + (S.lightTouch ? 'ON — gentle; faders own kick/bass' : 'OFF — full protective law'));
   });
 }
 
