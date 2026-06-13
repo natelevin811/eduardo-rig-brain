@@ -1,0 +1,13 @@
+{
+  "name": "eduardo-rig-brain-site",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Static doc/artifact site for the Eduardo rig brain (Vercel). Does not build or affect the Max devices.",
+  "scripts": {
+    "build": "node tools/build-site.mjs"
+  },
+  "dependencies": {
+    "marked": "^12.0.0"
+  }
+}

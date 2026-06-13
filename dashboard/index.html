@@ -80,6 +80,34 @@
   #link { font-size:10px; letter-spacing:.08em; color:var(--dim); display:flex; align-items:center; gap:5px; }
   #link::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--green); }
   #link.down::before { background:var(--red); } #link.down { color:var(--red); }
+  /* SHOW mode = nothing to fiddle with. Hide the log/layout chrome and the
+     alerts scrollback so the screen is just the performance state. The critical
+     channel (stale-heartbeat / link-down) stays — it's the top banner, not these.
+     Stage + Classic stay reachable (performance + the safety escape hatch). */
+  body.showmode #btnLog, body.showmode #btnCopy,
+  body.showmode #btnEdit, body.showmode #btnReset,
+  body.showmode #p-alerts { display:none !important; }
+  /* I Ching panel */
+  #ichingBody { display:flex; gap:18px; align-items:center; height:100%; }
+  #ichingEmpty { color:var(--dim); font-size:13px; }
+  #ichingCard { display:flex; gap:20px; align-items:center; width:100%; }
+  #ichingLines { display:flex; flex-direction:column-reverse; gap:7px; flex:0 0 auto; }
+  #ichingLines .ln { display:flex; align-items:center; gap:9px; height:13px; }
+  #ichingLines .bar { display:flex; gap:8px; width:78px; }
+  #ichingLines .bar span { height:11px; border-radius:3px; background:var(--violet); box-shadow:0 0 8px rgba(138,111,192,.35); }
+  #ichingLines .bar.yang span { width:100%; }
+  #ichingLines .bar.yin span { width:46%; }
+  #ichingLines .ln.changing .bar span { background:var(--amber); box-shadow:0 0 10px rgba(224,162,63,.5); }
+  #ichingLines .mk { font-family:var(--mono); font-size:10px; color:var(--amber); width:10px; }
+  #ichingLines .ln:not(.changing) .mk { color:transparent; }
+  #ichingMeta { flex:1; min-width:0; }
+  #ichingPresent { font-family:var(--disp); font-weight:800; font-size:20px; color:var(--txt); line-height:1.1; }
+  #ichingPresent .gly { color:var(--violet); margin-right:8px; font-size:18px; }
+  #ichingPresent .nm { color:var(--txt2); font-weight:500; font-size:14px; display:block; margin-top:2px; }
+  #ichingRelating { font-size:12.5px; color:var(--txt2); margin-top:10px; }
+  #ichingRelating b { color:var(--amber); }
+  #ichingNote { font-size:11px; color:var(--dim); margin-top:10px; }
+  #p-iching.spent { opacity:.62; }
 
   #grid { display:grid; grid-template-columns:repeat(12,1fr); gap:var(--gap); grid-auto-rows:var(--row);
           grid-auto-flow:row dense; flex:1; min-height:0; align-content:start; }
@@ -114,7 +142,9 @@
               text-overflow:ellipsis; transition:color .3s; }
   #moveName.idle { color:var(--dim); font-weight:500; font-size:clamp(22px,3vw,32px); }
   #moveName.dry::after { content:" · DRY"; color:var(--amber-d); font-size:.4em; vertical-align:.4em; letter-spacing:.1em; }
-  #progPctTop { margin-left:auto; font-family:var(--disp); font-weight:700; font-size:22px; color:var(--txt2); }
+  #progPctTop { margin-left:auto; font-family:var(--disp); font-weight:700; font-size:28px; color:var(--txt); }
+  #progPctTop .barlbl { font-family:inherit; font-weight:500; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-right:7px; vertical-align:middle; }
+  #progPctTop .ofN { color:var(--dim); font-weight:500; }
   #moveDesc { font-size:12px; color:var(--txt2); line-height:1.4; min-height:1.4em; }
   #loopWrap { flex:1; min-height:64px; position:relative; }
   #loopCanvas { width:100%; height:100%; display:block; cursor:ew-resize; }
@@ -165,9 +195,13 @@
   #djLegend b { color:var(--teal); font-weight:500; }
   .djrow { display:flex; align-items:center; gap:10px; }
   .djrow .dn { width:64px; font-size:11px; color:var(--dim); flex:0 0 auto; }
-  .djtrack { flex:1; height:14px; border-radius:8px; background:#0a0806; position:relative; box-shadow:inset 0 1px 2px rgba(0,0,0,.5); }
-  .djctr { position:absolute; top:-3px; bottom:-3px; left:50%; width:2px; background:var(--dim2); transform:translateX(-1px); }
-  .djdot { position:absolute; top:50%; width:12px; height:12px; border-radius:50%; transform:translate(-50%,-50%);
+  .djtrack { flex:1; height:14px; border-radius:8px; background:#0a0806; position:relative; box-shadow:inset 0 1px 2px rgba(0,0,0,.5); overflow:hidden; }
+  /* bipolar deflection fill: grows from the center detent out to the dot, so
+     each filter's direction + amount reads in one glance instead of a lone dot */
+  .djfill { position:absolute; top:0; bottom:0; background:var(--amber-d); opacity:.5; transition:left .12s, width .12s, background .2s; }
+  .djfill.centered { background:var(--teal-d); }
+  .djctr { position:absolute; top:-3px; bottom:-3px; left:50%; width:2px; background:var(--dim2); transform:translateX(-1px); z-index:1; }
+  .djdot { position:absolute; top:50%; width:12px; height:12px; border-radius:50%; transform:translate(-50%,-50%); z-index:2;
            background:var(--amber); box-shadow:0 0 8px 1px rgba(224,162,63,.5); transition:left .12s, background .2s; }
   .djdot.centered { background:var(--teal); box-shadow:0 0 8px 1px rgba(70,168,158,.55); }
   .djrow .dv { width:62px; text-align:right; font-size:11px; color:var(--txt2); flex:0 0 auto; }
@@ -342,6 +376,21 @@
     <div class="body"><div id="ritList"><div class="rit dt">not yet run</div></div></div>
     <div class="resize" data-resize="p-ritual"></div>
   </section>
+
+  <section class="panel" id="p-iching" data-c="4" data-r="2" draggable="false" style="--accent:var(--violet)">
+    <div class="head"><span class="grip">⠿</span><span class="ttl">i ching</span>
+      <span class="sub">— the cast, when ICHING runs</span><span class="hidebtn" data-hide="p-iching">×</span></div>
+    <div class="body"><div id="ichingBody"><div id="ichingEmpty">no reading yet — launch an <b>ICHING</b> clip</div>
+      <div id="ichingCard" style="display:none">
+        <div id="ichingLines"></div>
+        <div id="ichingMeta">
+          <div id="ichingPresent"></div>
+          <div id="ichingRelating"></div>
+          <div id="ichingNote">changing lines ◇ pulse the relating hexagram. ABORT ends it.</div>
+        </div>
+      </div></div></div>
+    <div class="resize" data-resize="p-iching"></div>
+  </section>
 </main>
 
 <div id="stage">
@@ -410,7 +459,8 @@ const state={
   alerts:[], link:{failed:false},
   spark:{}, sparkCtx:{}, connectedAt:0, startedAt:Date.now(), firstPlayAt:0,
   beatDirty:{conductor:false,sentinel:false},
-  hold:{active:false,bar:0}, sv:'move'
+  hold:{active:false,bar:0}, sv:'move',
+  iching:null   // last cast hexagram {lines,present,relating,ts,active}
 };
 for(const b of BUSES){ state.buses[b]={m:0,trim:0,layers:0}; state.spark[b]=new Array(SPARK_LEN).fill(0); }
 
@@ -429,9 +479,11 @@ const djRows=$('djRows'), stageDj=$('stageDj');
 for(const b of BUSES){
   for(const host of [djRows,stageDj]){
     const r=document.createElement('div'); r.className='djrow';
-    r.innerHTML=`<span class="dn">${SHORT[b]}</span><div class="djtrack"><div class="djctr"></div>
-      <div class="djdot" id="${host===djRows?'dj':'sdj'}-${b}"></div></div>
-      <span class="dv" id="${host===djRows?'djv':'sdjv'}-${b}">—</span>`;
+    const pfx=host===djRows?'dj':'sdj';
+    r.innerHTML=`<span class="dn">${SHORT[b]}</span><div class="djtrack">
+      <div class="djfill" id="${pfx}f-${b}"></div><div class="djctr"></div>
+      <div class="djdot" id="${pfx}-${b}"></div></div>
+      <span class="dv" id="${pfx==='dj'?'djv':'sdjv'}-${b}">—</span>`;
     host.appendChild(r);
   }
 }
@@ -500,12 +552,14 @@ function handle(ev){
       if(ev.phase==='start'||ev.phase==='armed'){
         state.move={name:ev.name||'move',active:true,dry:!!ev.dry,bars:0,of:ev.bars||(ev.schedule&&ev.schedule.total)||0,
           touching:ev.touching||[],skipped:ev.skipped||[],next:ev.next||'',schedule:ev.schedule||null};
+        if(ev.iching){ state.iching={...ev.iching,ts:Date.now(),active:true}; renderIching(); }
         if(ev.skipped&&ev.skipped.length) pushAlert('sentry',(ev.name||'move')+' skipped: '+ev.skipped.join(', '));
       } else if(ev.phase==='cleanslate'){
         state.move={name:'CLEAN SLATE',active:true,dry:!!ev.dry,bars:0,of:0,touching:[],skipped:[],next:'',schedule:null};
         setTimeout(()=>handle({t:'move',phase:'idle'}),2500);
       } else if(ev.phase==='end'||ev.phase==='idle'||ev.phase==='superseded'){
         if(!ev.next) state.move={name:'idle',active:false,dry:false,bars:0,of:0,touching:[],skipped:[],next:'',schedule:null};
+        if(state.iching&&state.iching.active){ state.iching.active=false; renderIching(); }
       } break;
     }
     case 'ramp': state.move.bars=ev.bars; if(ev.of) state.move.of=ev.of; break;
@@ -614,12 +668,20 @@ function renderLegend(){
 
 // ---- DJ rows render ----
 function renderDj(prefix){
-  const c=state.dj.center;
+  const c=state.dj.center, cpct=c*100;
   for(const b of BUSES){
-    const v=state.dj.buses[b]; const dot=$(prefix+'-'+b), val=$((prefix==='dj'?'djv':'sdjv')+'-'+b);
-    if(v==null){ if(dot) dot.style.left='50%'; if(val){ val.textContent='—'; val.classList.remove('centered'); } continue; }
+    const v=state.dj.buses[b];
+    const dot=$(prefix+'-'+b), fill=$(prefix+'f-'+b), val=$((prefix==='dj'?'djv':'sdjv')+'-'+b);
+    if(v==null){
+      if(dot){ dot.style.left='50%'; dot.classList.remove('centered'); }
+      if(fill){ fill.style.left=cpct+'%'; fill.style.width='0%'; }
+      if(val){ val.textContent='—'; val.classList.remove('centered'); }
+      continue;
+    }
     const centered=Math.abs(v-c)<=0.02;
-    if(dot){ dot.style.left=(v*100)+'%'; dot.classList.toggle('centered',centered); }
+    const pct=Math.max(0,Math.min(100,v*100));
+    if(dot){ dot.style.left=pct+'%'; dot.classList.toggle('centered',centered); }
+    if(fill){ const lo=Math.min(pct,cpct); fill.style.left=lo+'%'; fill.style.width=Math.abs(pct-cpct)+'%'; fill.classList.toggle('centered',centered); }
     if(val){ const off=Math.round((v-c)*200); val.textContent=centered?'center':(off>0?'+':'')+off+'%'; val.classList.toggle('centered',centered); }
   }
 }
@@ -645,6 +707,7 @@ function paint(){
   $('fAlive').classList.toggle('on',state.flags.alive); $('fDry').classList.toggle('on',state.flags.dry);
   $('fArc').classList.toggle('on',state.flags.nightArc); $('fFrozen').classList.toggle('on',state.flags.frozen);
   const m=$('mode'); m.textContent=state.mode; m.className=state.mode==='SHOW'?'show':'rehearse';
+  document.body.classList.toggle('showmode',state.mode==='SHOW'); // auto-declutter in SHOW
 
   const banner=$('banner');
   if(state.link.failed){ banner.textContent='TELEMETRY LINK DOWN — devices unaffected, reconnecting…'; banner.className='show warn'; }
@@ -654,11 +717,15 @@ function paint(){
 
   const mv=state.move, pct=mv.of>0?Math.min(100,(mv.bars/mv.of)*100):0;
   const nameEl=$('moveName'); nameEl.textContent=mv.name; nameEl.classList.toggle('idle',!mv.active); nameEl.classList.toggle('dry',mv.dry);
-  $('progPctTop').textContent=mv.active&&mv.of>0?Math.round(pct)+'%':'—';
+  // bar number, not percentage — a musician counts bars, so 1-indexed "bar 3/8"
+  // is what reads across the room (rig 2026-06-13 ask). mv.bars is 0-indexed
+  // elapsed, so the bar we're IN is bars+1, clamped to the total.
+  const barNow=Math.min(mv.of,mv.bars+1);
+  $('progPctTop').innerHTML=mv.active&&mv.of>0?`<span class="barlbl">bar</span>${barNow}<span class="ofN">/${mv.of}</span>`:'—';
   $('moveDesc').textContent=mv.active?moveDesc(mv.name):'';
   const hb=$('holdBadge');
   if(state.hold.active){ hb.classList.add('show'); hb.textContent='HELD · bar '+state.hold.bar.toFixed(1); } else hb.classList.remove('show');
-  $('nowNext').innerHTML=mv.active&&mv.of>0?`bar <b>${mv.bars} / ${mv.of}</b>${nextEventText()?' · next '+nextEventText():''}`:'';
+  $('nowNext').innerHTML=mv.active&&mv.of>0&&nextEventText()?`next <b>${nextEventText()}</b>`:'';
   $('touching').innerHTML=mv.touching.length?'touching <b>'+mv.touching.map(escapeHtml).join(' · ')+'</b>'
       +(mv.skipped.length?` <span class="skip" title="parked outside safe range — skipped to avoid a jump">skipped ${mv.skipped.map(escapeHtml).join(' ')}</span>`:''):'';
   renderLegend();
@@ -679,6 +746,22 @@ function paint(){
   if(state.alerts.length) renderAlerts();
 }
 
+function renderIching(){
+  const ic=state.iching, card=$('ichingCard'), empty=$('ichingEmpty');
+  if(!ic){ if(card) card.style.display='none'; if(empty) empty.style.display=''; return; }
+  empty.style.display='none'; card.style.display='';
+  $('p-iching').classList.toggle('spent',!ic.active);
+  // lines bottom-to-top; flex column-reverse stacks them visually correct (top line on top)
+  $('ichingLines').innerHTML=ic.lines.map(l=>{
+    const cls='ln'+(l.changing?' changing':'');
+    const bar='bar '+(l.yang?'yang':'yin');
+    return `<div class="${cls}"><span class="mk">${l.changing?'◇':''}</span><div class="${bar}"><span></span>${l.yang?'':'<span></span>'}</div></div>`;
+  }).join('');
+  const p=ic.present;
+  $('ichingPresent').innerHTML=`<span class="gly">${p.upperGlyph}${p.lowerGlyph}</span>${p.n}<span class="nm">${escapeHtml(p.name||'')}</span>`;
+  if(ic.relating){ $('ichingRelating').innerHTML=`changing toward <b>${ic.relating.n} · ${escapeHtml(ic.relating.name||'')}</b> ${ic.relating.upperGlyph}${ic.relating.lowerGlyph}`; }
+  else $('ichingRelating').innerHTML='<span style="color:var(--dim)">no changing lines — a settled reading</span>';
+}
 function renderStage(mv,pct,hrDb){
   $('sBeat').textContent=$('beat').textContent; $('sBar').textContent=$('barn').textContent; $('sTempo').textContent=$('tempo').textContent;
   for(const [src,id] of [['conductor','sHcond'],['sentinel','sHsent']]){ const node=$(id); const live=$(src==='conductor'?'hcond':'hsent');
@@ -686,7 +769,7 @@ function renderStage(mv,pct,hrDb){
   const sn=$('stageName'); sn.textContent=mv.name; sn.classList.toggle('idle',!mv.active);
   $('stageDesc').textContent=mv.active?moveDesc(mv.name):'';
   $('sMain').textContent=state.main.toFixed(2);
-  $('sNowNext').innerHTML=mv.active&&mv.of>0?`bar <b>${mv.bars}/${mv.of}</b>${nextEventText()?' · next '+nextEventText():''}`:'';
+  $('sNowNext').innerHTML=mv.active&&mv.of>0?`bar <b>${Math.min(mv.of,mv.bars+1)}/${mv.of}</b>${nextEventText()?' · next '+nextEventText():''}`:'';
   const sv=state.sv;
   $('stageName').style.display=(sv==='move')?'':'none';
   $('stageDesc').style.display=(sv==='move')?'':'none';

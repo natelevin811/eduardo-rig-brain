@@ -50,6 +50,12 @@ var TUNING = {
   swellWet:      0.50,   // SWELL <return> generic target
   pulseDepth:    0.04,   // PULSE: felt, not heard. Hard cap; do not raise past 0.08.
 
+  // I CHING (off by default; ICHING command only). Bounded, gentle, reversible —
+  // a cast reading colors the space, it does not take it over. Caps kept small so
+  // a "sour" reading is never more than a wash you can ABORT.
+  ichingWet:     0.12,   // per yang line: bounded send swell above captured. Hard cap.
+  ichingShimmer: 0.03,   // changing line: sine depth on send D. Felt, not heard.
+
   // CL lane + riser levels, raw mixer values (0.85 = 0 dB, 0.0 = -inf).
   clZeroDb:      0.85,
   shepSwellAbs:  1.0,    // RISE: ShephardsTone rack macro "Output" swell-to,
@@ -86,6 +92,94 @@ var FOCUS_ALIASES = {
   'PADS': 'PadsBus', 'LEADS': 'LeadsBus', 'PERC': 'PercBus', 'HIDRUMS': 'HiDrumsBus'
 };
 var SEND_LETTERS = { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5 };
+
+// ---------------------------------------------------------------------------
+// I CHING — a cast hexagram, for display + a bounded gesture. Pure data + math;
+// no Live access here. The ICHING move turns a cast into normal send lanes, so
+// every safety property (grabs, sentries, capture/restore, ABORT/CLEAN SLATE)
+// is inherited. This module just casts and names.
+// ---------------------------------------------------------------------------
+var ICHING = (function () {
+  // Trigram value = bottom + mid*2 + top*4 (bottom line is the low bit).
+  var TRI = { HEAVEN: 7, LAKE: 3, FIRE: 5, THUNDER: 1, WIND: 6, WATER: 2, MOUNTAIN: 4, EARTH: 0 };
+  var TRI_BY_VAL = {}, TRI_GLYPH = {
+    HEAVEN: '☰', LAKE: '☱', FIRE: '☲', THUNDER: '☳',
+    WIND: '☴', WATER: '☵', MOUNTAIN: '☶', EARTH: '☷'
+  };
+  for (var tn in TRI) { if (TRI.hasOwnProperty(tn)) TRI_BY_VAL[TRI[tn]] = tn; }
+
+  // King Wen number by [upper trigram][lower trigram]. Verified hexagram-by-
+  // hexagram against the standard sequence (anchors: Heaven/Heaven=1, Earth/
+  // Earth=2, Earth-over-Heaven=11 Tai, Heaven-over-Earth=12 Pi).
+  var KW = {
+    HEAVEN:   { HEAVEN: 1, LAKE: 10, FIRE: 13, THUNDER: 25, WIND: 44, WATER: 6,  MOUNTAIN: 33, EARTH: 12 },
+    LAKE:     { HEAVEN: 43, LAKE: 58, FIRE: 49, THUNDER: 17, WIND: 28, WATER: 47, MOUNTAIN: 31, EARTH: 45 },
+    FIRE:     { HEAVEN: 14, LAKE: 38, FIRE: 30, THUNDER: 21, WIND: 50, WATER: 64, MOUNTAIN: 56, EARTH: 35 },
+    THUNDER:  { HEAVEN: 34, LAKE: 54, FIRE: 55, THUNDER: 51, WIND: 32, WATER: 40, MOUNTAIN: 62, EARTH: 16 },
+    WIND:     { HEAVEN: 9,  LAKE: 61, FIRE: 37, THUNDER: 42, WIND: 57, WATER: 59, MOUNTAIN: 53, EARTH: 20 },
+    WATER:    { HEAVEN: 5,  LAKE: 60, FIRE: 63, THUNDER: 3,  WIND: 48, WATER: 29, MOUNTAIN: 39, EARTH: 8 },
+    MOUNTAIN: { HEAVEN: 26, LAKE: 41, FIRE: 22, THUNDER: 27, WIND: 18, WATER: 4,  MOUNTAIN: 52, EARTH: 23 },
+    EARTH:    { HEAVEN: 11, LAKE: 19, FIRE: 36, THUNDER: 24, WIND: 46, WATER: 7,  MOUNTAIN: 15, EARTH: 2 }
+  };
+
+  var NAMES = [ '',
+    'The Creative', 'The Receptive', 'Difficulty at the Beginning', 'Youthful Folly',
+    'Waiting', 'Conflict', 'The Army', 'Holding Together', 'Small Taming', 'Treading',
+    'Peace', 'Standstill', 'Fellowship', 'Great Possession', 'Modesty', 'Enthusiasm',
+    'Following', 'Work on the Decayed', 'Approach', 'Contemplation', 'Biting Through',
+    'Grace', 'Splitting Apart', 'Return', 'Innocence', 'Great Taming', 'Nourishment',
+    'Great Exceeding', 'The Abysmal Water', 'The Clinging Fire', 'Influence', 'Duration',
+    'Retreat', 'Great Power', 'Progress', 'Darkening of the Light', 'The Family',
+    'Opposition', 'Obstruction', 'Deliverance', 'Decrease', 'Increase', 'Breakthrough',
+    'Coming to Meet', 'Gathering Together', 'Pushing Upward', 'Oppression', 'The Well',
+    'Revolution', 'The Cauldron', 'The Arousing', 'Keeping Still', 'Development',
+    'The Marrying Maiden', 'Abundance', 'The Wanderer', 'The Gentle', 'The Joyous',
+    'Dispersion', 'Limitation', 'Inner Truth', 'Small Exceeding', 'After Completion',
+    'Before Completion' ];
+
+  // Three-coin cast: heads=3 tails=2, sum 6..9.
+  //   6 = old yin (changing -> yang), 7 = young yang, 8 = young yin, 9 = old yang (changing -> yin)
+  function castLine() {
+    var s = 0;
+    for (var c = 0; c < 3; c++) s += (Math.random() < 0.5 ? 2 : 3);
+    return { yang: (s === 7 || s === 9), changing: (s === 6 || s === 9), sum: s };
+  }
+
+  // lines bottom-to-top. yangFlags: array of 6 booleans (use future state if relating).
+  function hexNumber(yangFlags) {
+    var lowV = (yangFlags[0] ? 1 : 0) + (yangFlags[1] ? 2 : 0) + (yangFlags[2] ? 4 : 0);
+    var upV  = (yangFlags[3] ? 1 : 0) + (yangFlags[4] ? 2 : 0) + (yangFlags[5] ? 4 : 0);
+    var up = TRI_BY_VAL[upV], lo = TRI_BY_VAL[lowV];
+    return { n: KW[up][lo], upper: up, lower: lo,
+             upperGlyph: TRI_GLYPH[up], lowerGlyph: TRI_GLYPH[lo] };
+  }
+
+  function descof(h) { return { n: h.n, name: NAMES[h.n] || '', upper: h.upper, lower: h.lower,
+                                upperGlyph: h.upperGlyph, lowerGlyph: h.lowerGlyph }; }
+
+  // Cast a full reading: present hexagram, the changing lines, and the relating
+  // hexagram (present with all changing lines flipped). Returns a flat, drawable
+  // payload for telemetry.
+  function cast() {
+    var lines = [], present = [], anyChange = false, future = [];
+    for (var i = 0; i < 6; i++) {
+      var ln = castLine();
+      lines.push({ yang: ln.yang, changing: ln.changing });
+      present.push(ln.yang);
+      future.push(ln.changing ? !ln.yang : ln.yang);
+      if (ln.changing) anyChange = true;
+    }
+    var p = descof(hexNumber(present));
+    var payload = {
+      lines: lines,                 // bottom-to-top: {yang, changing}
+      present: p,
+      relating: anyChange ? descof(hexNumber(future)) : null
+    };
+    return payload;
+  }
+
+  return { cast: cast, hexNumber: hexNumber, NAMES: NAMES, TRI: TRI };
+})();
 
 // ---------------------------------------------------------------------------
 // helpers for terse lane construction
@@ -278,6 +372,33 @@ var MOVES = {
                    segments: [{ type: 'sine', bars: n, depth: T.pulseDepth, periodBars: 1 }] });
     }
     return { bars: n, lanes: lanes, events: [] };
+  }},
+
+  // -- I CHING (off by default; create a clip named "ICHING" to use it) -------
+  'ICHING': { defaultBars: 24, build: function (n, arg, T) {
+    // Cast a hexagram and let it gently color the space. The six lines map to
+    // three WASH buses x two sends (lower trigram -> send B, upper -> send C):
+    // a YANG line swells that send a small, bounded amount; a YIN line is
+    // stillness (left where the hands had it); a CHANGING line adds one slow,
+    // barely-there sine shimmer on send D of that bus. Everything is captured
+    // and restored, bounded by tiny caps, and ABORT/CLEAN SLATE end it at once.
+    var reading = ICHING.cast();
+    var half = n / 2;
+    var lanes = [];
+    for (var b = 0; b < WASH_BUSES.length; b++) {
+      var bus = WASH_BUSES[b];
+      var lower = reading.lines[b];       // bottom trigram line -> send B
+      var upper = reading.lines[b + 3];   // top trigram line    -> send C
+      if (lower.yang) lanes.push(laneSend(bus, 'B', [ramp(half, { rel: T.ichingWet }), restore(n - half)]));
+      if (upper.yang) lanes.push(laneSend(bus, 'C', [ramp(half, { rel: T.ichingWet }), restore(n - half)]));
+      if (lower.changing || upper.changing) {
+        lanes.push({ target: { kind: 'send', bus: bus, send: SEND_LETTERS['D'] }, sentry: 'send',
+                     segments: [{ type: 'sine', bars: n, depth: T.ichingShimmer, periodBars: 2 }] });
+      }
+    }
+    // even an all-yin reading is valid (pure stillness) — no lanes, just the
+    // hexagram on the dashboard for n bars.
+    return { bars: n, lanes: lanes, events: [], iching: reading };
   }}
 };
 
