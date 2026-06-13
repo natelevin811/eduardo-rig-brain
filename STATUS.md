@@ -1,4 +1,42 @@
-# STATUS.md — build status (updated 2026-06-13, post track-move fix)
+# STATUS.md — build status (updated 2026-06-13, post show_4 batch)
+
+## 2026-06-13 — show_4 batch (build `2026-06-13k iching`)
+
+Worked the last on-rig note list. All committed on `claude/bold-cori-wtmsw1`
+(draft PR #18). Link grep re-proven clean (raw api.set/call only inside
+Resolver); ES5 clean (comment-stripped check); node --check passes; King Wen
+table verified a clean 1–64 permutation; dashboard JS + renderIching smoke
+tests pass.
+
+- **CLEAN SLATE now rolls displaced sends home** (the reported bug: "clean
+  slate didnt roll down all the F sends; commands running while it says idle").
+  Root cause: releasing a grab only *freezes* a displaced send; CLEAN SLATE
+  snapped known params to rest but sends had no rest entry, and a held VEIL/
+  NIGHTFALL displacement had no memory. Fix: a per-param displaced book
+  (`S.displaced`) booked once at move start, struck when a lane lands home,
+  rolled back (to the pre-move hands value) by CLEAN SLATE/ABORT before the
+  fixed-rest snaps. The still-audible send WAS the "running while idle." **Rig
+  test:** run a VEIL (send F) or BLOOM, hit CLEAN SLATE mid-move, confirm the
+  sends return to where your hands had them and the panel reads idle = silence.
+- **Dashboard:** conductor readout shows the **bar number (1-indexed "bar 3/8")**
+  instead of a percentage; **SHOW mode auto-declutters** (hides Log/Copy/Layout/
+  Reset + the alerts scrollback; the stale-heartbeat/link red banner stays);
+  the **classic UI is no longer a trap** — a "→ New UI" link + `\` toggles back.
+- **`docs/RUNBOOK-KEYMAP.md`** — one page: every command clip, both device
+  faces, dashboard hotkeys, and the move/rename answer (move the track anywhere
+  = id-pinned; move clips between scenes freely = name-keyed; rename to any
+  VALID command — the name IS the command; unknown names no-op, never misfire).
+- **`docs/EXPLAINER.html`** — a stylized, self-contained artifact of what the
+  rig does, with the failure-recovery "war stories" front and center.
+- **I CHING (`ICHING` move) — OFF BY DEFAULT.** Cast a hexagram, render it in
+  the 7777 window (new `i ching` panel: lines, changing marks, King Wen number/
+  name, relating hexagram), and play a hard-capped, fully reversible send
+  gesture from the cast. It's a normal move, so grabs/sentries/restore/Link
+  contract all apply and **ABORT/CLEAN SLATE kill it instantly**. Does nothing
+  until a clip is named `ICHING`. **Rig test (low priority):** make an ICHING
+  clip, launch it, confirm the hexagram renders and ABORT rolls the sends home.
+
+## 2026-06-13 — CONDUCTOR track is now position-proof (build `2026-06-13i`)
 
 ## 2026-06-13 — CONDUCTOR track is now position-proof (build `2026-06-13i`)
 
