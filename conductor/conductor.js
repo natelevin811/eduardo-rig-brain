@@ -20,7 +20,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13a cold-open-recovery';
+var BUILD = '2026-06-13b drive-trace-dash';
 (function () {
   var loc = '';
   try {
@@ -644,8 +644,17 @@ function _sync(beats) {
       mv.dbgBar = dbgBar;
       for (i = 0; i < mv.lanes.length; i++) {
         var ln = mv.lanes[i];
-        if (!ln.done) dbg('drive[' + ln.label + '] slot=' + ln.slot + ' v=' + ln.lastV +
+        if (ln.done) continue;
+        dbg('drive[' + ln.label + '] slot=' + ln.slot + ' v=' + ln.lastV +
           ' native[' + ln.info.min + '..' + ln.info.max + '] captured=' + ln.captured);
+        // every 4 bars, mirror the trace onto the dashboard (REHEARSE only) so
+        // the Max window isn't required to read what the engine is driving
+        if (S.mode !== 'SHOW' && dbgBar % 4 === 0) {
+          Telemetry.alert('drive', ln.label + ' slot ' + ln.slot +
+            ' v=' + (Math.round(ln.lastV * 1000) / 1000) +
+            ' [' + ln.info.min + '..' + ln.info.max + ']' +
+            ' cap=' + (Math.round(ln.captured * 1000) / 1000));
+        }
       }
     }
 
