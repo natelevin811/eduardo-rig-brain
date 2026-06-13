@@ -1,5 +1,45 @@
 # STATUS.md — build status (updated 2026-06-12, post first-rig-test fixes)
 
+## ⏭ NEXT TEST (Eduardo, at the laptop — single most important thing)
+
+On build `2026-06-13d retrigger` (main `ef98800`, pulled): press TEST once
+(re-inits + proves build), play, press **RISE 16 once**, hands off for all 18
+bars (~36 s). Read the `drive` alerts at bars 0/4/8/12/16: v climbing toward
+127 by bar 12 = moves were always fine (exp curves are back-loaded — judge at
+bars 11–16, by ear too); v still ~0 at bar 12 = curve math guilty, fix from
+the numbers. Also note whether the G clip (42-She) + noise clip (WhiteNoise)
+fire. This is the only open engine question.
+
+## Migration scorecard (2026-06-13, after day-2 session)
+
+PROVEN on the performance machine: name resolution all-clean (Utility gain =
+`Output` here — setmap candidates), full-green RITUAL incl. HELIX marks, exact
+fallback clock (plugsync~ feed is beats-not-ticks on this Max — trust gate
+rejects it), FROZEN tracks transport via 2 Hz poll (is_playing observer never
+fires here), grab pool physically moves params (send + DJ probes, drive +
+restore), command clips arm/supersede/sequence, cold-open recovery (retry
+ladder ~3 min + TEST/RITUAL re-resolve + they re-init a blanked brain after a
+pull — re-drag is never needed anymore), build stamps everywhere, dashboard
+alert lane scrollable with ↻ replay marking, drive-trace mirrors engine
+values to the dashboard. Link-contract grep re-proven post-changes (only hits
+= resolver's own refusal tables).
+
+UNVERIFIED (rehearsal-grade, needs eyes/ears): the NEXT TEST above; single
+press always registering (13d fired_slot_index fix — written, untested);
+sentinel trim engage/release (never yet pushed MAIN over the 0.92 ceiling for
+4+ s); SENTRIM knobs at 0 dB + HELIX TRIM 7.78 / FADE −5.89 after RITUAL
+(Output dB-nativeness eyeball); Fade direction (C2, setmap says VERIFY);
+whole move repertoire by ear incl. SEQ clips, CLEAN SLATE, ABORT mid-move,
+ALIVE drift; full RIG-TEST.md + soak pass.
+
+LOOSE ENDS: `get: no valid object set` console flood — source unconfirmed
+(recheck in a cleared Max window with a single fresh device pair, idle);
+EADDRINUSE:7777 after Live restarts (orphan node server — full Live quit
+clears; keep exactly one SENTINEL); browser SSE reconnects often (harmless,
+↻-marked); human checks: buffer 128, Link Start Stop Sync OFF; performer to
+confirm LoDrumsBus −106 dB / PercBus −86 dB faders are intentional and
+PadsBus send B home position (probes once stranded it at 1.0).
+
 ## Performance-machine migration (2026-06-12 afternoon)
 
 The performance machine's Live build exposes Utility's gain knob to the LOM as
