@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>eduardo-rig-brain — docs</title>
+<meta name="description" content="Docs for the eduardo-rig-brain live ambient looping rig: CONDUCTOR + SENTINEL, telemetry dashboard, and backlog tools.">
+<style>
+  :root{
+    --ground:#15130f; --panel:#1b1813; --line:#2a261f; --ink:#f3ead9;
+    --dim:#9a9080; --rust:#c2622a; --teal:#2bb3a3; --amber:#e3974a;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:'Bricolage Grotesque',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--ground);color:var(--ink);font-family:var(--sans);
+       font-size:16px;line-height:1.6;display:flex;min-height:100%}
+  a{color:var(--teal);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* sidebar */
+  nav#side{width:264px;flex:0 0 264px;background:var(--panel);
+    border-right:1px solid var(--line);padding:18px 0;overflow-y:auto;
+    position:sticky;top:0;height:100vh}
+  nav#side .brand{padding:0 18px 12px;border-bottom:1px solid var(--line);margin-bottom:8px}
+  nav#side .brand h1{font-size:15px;margin:0;letter-spacing:.02em}
+  nav#side .brand .tag{color:var(--dim);font-size:11px;font-family:var(--mono);margin-top:3px}
+  .group{padding:12px 18px 2px;color:var(--amber);font-size:11px;letter-spacing:.14em;
+    text-transform:uppercase;font-family:var(--mono)}
+  nav#side a.item{display:block;padding:5px 18px;color:var(--ink);font-size:14px;
+    border-left:2px solid transparent}
+  nav#side a.item:hover{background:#221e18;text-decoration:none}
+  nav#side a.item.active{border-left-color:var(--rust);background:#241f17;color:#fff}
+  nav#side a.item .ext{color:var(--dim);font-size:11px;font-family:var(--mono);float:right}
+
+  /* content */
+  main{flex:1;min-width:0;overflow-x:hidden}
+  .wrap{max-width:880px;margin:0 auto;padding:34px 40px 80px}
+  #content h1,#content h2,#content h3{font-family:var(--sans);line-height:1.25;
+    margin:1.6em 0 .5em}
+  #content h1{font-size:30px;margin-top:.2em;border-bottom:1px solid var(--line);padding-bottom:.25em}
+  #content h2{font-size:22px;color:#fff;border-bottom:1px solid var(--line);padding-bottom:.2em}
+  #content h3{font-size:17px;color:var(--amber)}
+  #content p,#content li{font-size:15.5px}
+  #content code{font-family:var(--mono);font-size:13px;background:#221e18;
+    padding:.12em .4em;border-radius:4px;color:#e8dcc4}
+  #content pre{background:#100e0b;border:1px solid var(--line);border-radius:8px;
+    padding:14px 16px;overflow-x:auto}
+  #content pre code{background:none;padding:0;color:#d6c9ad;font-size:12.5px;line-height:1.55}
+  #content blockquote{margin:1em 0;padding:.3em 1em;border-left:3px solid var(--teal);
+    color:var(--dim);background:#191510}
+  #content table{border-collapse:collapse;width:100%;margin:1em 0;font-size:14px}
+  #content th,#content td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+  #content th{background:#221e18;color:var(--amber);font-family:var(--mono);font-size:12px;letter-spacing:.04em}
+  #content tr:nth-child(even) td{background:#191510}
+  #content hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+  #content img,#content svg{max-width:100%}
+  #content ul,#content ol{padding-left:1.4em}
+  .crumb{font-family:var(--mono);font-size:12px;color:var(--dim);margin-bottom:8px}
+  .crumb .src{color:var(--rust)}
+  .err{color:var(--rust);font-family:var(--mono);font-size:14px}
+  .loading{color:var(--dim);font-family:var(--mono)}
+
+  /* mobile */
+  #menubtn{display:none}
+  @media (max-width:820px){
+    body{flex-direction:column}
+    nav#side{position:static;width:100%;height:auto;flex:none;
+      border-right:none;border-bottom:1px solid var(--line)}
+    nav#side.collapsed .group,nav#side.collapsed a.item,nav#side.collapsed .brand .tag{display:none}
+    #menubtn{display:block;position:absolute;right:14px;top:14px;background:#221e18;
+      color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 10px;
+      font-family:var(--mono);font-size:12px}
+    .wrap{padding:22px 18px 60px}
+  }
+</style>
+</head>
+<body>
+<nav id="side">
+  <div class="brand">
+    <h1>eduardo-rig-brain</h1>
+    <div class="tag">CONDUCTOR · SENTINEL · tools</div>
+    <button id="menubtn" aria-label="toggle menu">menu</button>
+  </div>
+  <div id="navlist"></div>
+</nav>
+<main>
+  <div class="wrap">
+    <div class="crumb" id="crumb"></div>
+    <article id="content"><p class="loading">loading…</p></article>
+  </div>
+</main>
+
+<script src="assets/marked.min.js"></script>
+<script>
+// --- the documents this site exposes. Add a line to surface a new doc. -------
+// type 'md'   -> rendered here.   type 'html' -> opens the artifact in a new tab.
+var DOCS = [
+  { group:"Overview", items:[
+    { title:"README",        path:"README.md",            type:"md" },
+    { title:"STATUS",        path:"STATUS.md",            type:"md" },
+  ]},
+  { group:"Spec & Runbooks", items:[
+    { title:"Build Spec v2", path:"docs/SPEC.md",         type:"md" },
+    { title:"Runbook",       path:"docs/RUNBOOK.md",      type:"md" },
+    { title:"Calibration",   path:"docs/CALIBRATION.md",  type:"md" },
+    { title:"Shell Build",   path:"docs/SHELL-BUILD.md",  type:"md" },
+    { title:"Rig Test",      path:"docs/RIG-TEST.md",     type:"md" },
+  ]},
+  { group:"Backlog Tools", items:[
+    { title:"Backlog Tools — report", path:"docs/BACKLOG-TOOLS.md", type:"md" },
+    { title:"Weaver README",          path:"weaver/README.md",      type:"md" },
+  ]},
+  { group:"Project", items:[
+    { title:"CLAUDE.md (kickoff)", path:"CLAUDE.md",       type:"md" },
+  ]},
+  { group:"Generated artifacts", items:[
+    { title:"Move Gallery",  path:"gallery/index.html",   type:"html", ext:"svg" },
+    { title:"Helix Card",    path:"out/helix-card.html",  type:"html", ext:"print" },
+    { title:"Live Dashboard",path:"dashboard/index.html", type:"html", ext:"ui" },
+  ]},
+];
+
+var DEFAULT = "README.md";
+
+// --- build the nav ----------------------------------------------------------
+(function buildNav(){
+  var html = "";
+  DOCS.forEach(function(g){
+    html += '<div class="group">'+esc(g.group)+'</div>';
+    g.items.forEach(function(it){
+      if(it.type === "html"){
+        html += '<a class="item" target="_blank" rel="noopener" href="'+attr(it.path)+'">'
+              + esc(it.title)+'<span class="ext">'+(it.ext||"open")+' ↗</span></a>';
+      } else {
+        html += '<a class="item" data-path="'+attr(it.path)+'" href="#'+attr(it.path)+'">'
+              + esc(it.title)+'</a>';
+      }
+    });
+  });
+  document.getElementById("navlist").innerHTML = html;
+})();
+
+// --- routing ----------------------------------------------------------------
+function currentPath(){
+  var h = decodeURIComponent((location.hash||"").replace(/^#/,""));
+  return h || DEFAULT;
+}
+function knownMd(path){
+  for(var i=0;i<DOCS.length;i++) for(var j=0;j<DOCS[i].items.length;j++){
+    var it=DOCS[i].items[j];
+    if(it.type==="md" && it.path===path) return it;
+  }
+  return null;
+}
+function setActive(path){
+  var links = document.querySelectorAll('nav#side a.item[data-path]');
+  links.forEach(function(a){ a.classList.toggle("active", a.getAttribute("data-path")===path); });
+}
+
+function render(){
+  var path = currentPath();
+  var it = knownMd(path);
+  var content = document.getElementById("content");
+  var crumb = document.getElementById("crumb");
+  if(!it){
+    content.innerHTML = '<p class="err">Unknown doc: '+esc(path)+'</p>';
+    return;
+  }
+  setActive(path);
+  crumb.innerHTML = 'rendering <span class="src">'+esc(path)+'</span>';
+  content.innerHTML = '<p class="loading">loading '+esc(path)+'…</p>';
+  fetch(path, {cache:"no-cache"}).then(function(r){
+    if(!r.ok) throw new Error(r.status+" "+r.statusText);
+    return r.text();
+  }).then(function(md){
+    var dirty = (window.marked && window.marked.parse)
+      ? window.marked.parse(md, {gfm:true, mangle:false, headerIds:true})
+      : "<pre>"+esc(md)+"</pre>";
+    content.innerHTML = dirty;
+    document.title = it.title + " — eduardo-rig-brain docs";
+    fixupLinks(content, path);
+    window.scrollTo(0,0);
+  }).catch(function(e){
+    content.innerHTML = '<p class="err">Could not load '+esc(path)+': '+esc(e.message)
+      + '</p><p class="loading">(on the deployed site this resolves to /'+esc(path)+')</p>';
+  });
+}
+
+// rewrite rendered links: .md -> hash route, external -> new tab, keep artifacts
+function fixupLinks(root, basePath){
+  var baseDir = basePath.indexOf("/")>=0 ? basePath.replace(/\/[^\/]*$/,"/") : "";
+  root.querySelectorAll("a[href]").forEach(function(a){
+    var href = a.getAttribute("href");
+    if(/^https?:\/\//i.test(href)){ a.target="_blank"; a.rel="noopener"; return; }
+    if(/^#/.test(href)) return;                       // in-page anchor
+    // resolve relative-to-doc
+    var resolved = href.replace(/^\.\//,"");
+    if(resolved.indexOf("/")!==0 && baseDir && !/^[a-z]+:/i.test(resolved))
+      resolved = normalize(baseDir + resolved);
+    if(/\.md($|[#?])/i.test(resolved)){
+      a.setAttribute("href", "#"+resolved.replace(/[#?].*$/,""));
+    } else if(/\.(html?|svg|png|pdf)$/i.test(resolved)){
+      a.setAttribute("href", resolved); a.target="_blank"; a.rel="noopener";
+    }
+  });
+}
+function normalize(p){
+  var parts=p.split("/"), out=[];
+  parts.forEach(function(s){
+    if(s===".."){ out.pop(); } else if(s!=="." && s!==""){ out.push(s); }
+  });
+  return out.join("/");
+}
+
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function attr(s){return esc(s).replace(/"/g,"&quot;");}
+
+window.addEventListener("hashchange", render);
+document.getElementById("menubtn").addEventListener("click", function(){
+  document.getElementById("side").classList.toggle("collapsed");
+});
+render();
+</script>
+</body>
+</html>
