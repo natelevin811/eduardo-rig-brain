@@ -20,7 +20,7 @@ outlets = 3;
 
 // BUILD stamp: posts on every compile (load AND autowatch recompile) so the
 // Max window always shows which file revision is actually running.
-var BUILD = '2026-06-13f api-fallback';
+var BUILD = '2026-06-13h loop-viz';
 (function () {
   var loc = '';
   try {
@@ -300,6 +300,13 @@ function _init() {
   reportResolution();
   Telemetry.emit('boot', { sub: 'conductor', missing: Resolver.getMissing().length, mode: S.mode });
 
+  // DJ-filter readout for the dashboard — Eduardo rides these by hand, so a
+  // ~1 Hz read-only poll lets the screen confirm they sit centered (reset).
+  if (REG.djTask) REG.djTask.cancel();
+  REG.djTask = new Task(function () { jailRun('djstate', emitDjState); }, this);
+  REG.djTask.interval = 900;
+  REG.djTask.repeat();
+
   // load race: M4L devices init while Live is still building the set, so some
   // names can be invisible on the first pass (seen on the rig 2026-06-12:
   // SENTRIM/HELIX params unresolved at load, fine minutes later). Retry a few
@@ -518,9 +525,54 @@ function startMove(step) {
 
   Telemetry.emit('move', {
     phase: 'start', name: S.activeMove.name, bars: built.bars,
-    touching: laneLabels(lanes), skipped: skipped, next: seqNextName(), dry: S.dryRun ? 1 : 0
+    touching: laneLabels(lanes), skipped: skipped, next: seqNextName(), dry: S.dryRun ? 1 : 0,
+    schedule: buildSchedule(lanes, S.activeMove.events, built.bars)
   });
   dbg('MOVE ' + S.activeMove.name + ' @ beat ' + startBeat + (S.dryRun ? ' [DRY-RUN]' : ''));
+}
+
+// Compact, drawable description of a move for the dashboard timeline:
+// total length, event marks (atBars + action), and each lane's segment
+// envelope normalised 0..1 within the param's native range.
+function buildSchedule(lanes, events, total) {
+  function nrm(info, v) {
+    var span = info.max - info.min;
+    return span > 0 ? (v - info.min) / span : 0;
+  }
+  var L = [];
+  for (var i = 0; i < lanes.length; i++) {
+    var ln = lanes[i], pts = [];
+    for (var s = 0; s < ln.segs.length; s++) {
+      var sg = ln.segs[s];
+      pts.push({ s: sg.startBars, e: sg.endBars,
+                 f: Math.round(nrm(ln.info, sg.from) * 1000) / 1000,
+                 t: Math.round(nrm(ln.info, sg.to) * 1000) / 1000,
+                 sine: sg.type === 'sine' ? 1 : 0 });
+    }
+    L.push({ label: ln.label, segs: pts });
+  }
+  var E = [];
+  for (var k = 0; k < (events || []).length; k++) E.push({ at: events[k].atBars, a: events[k].action });
+  return { total: total, lanes: L, events: E };
+}
+
+// DJ-filter read-only state for the dashboard (Eduardo rides these by hand).
+function emitDjState() {
+  if (!S.ready || !REG.djfilter) return;
+  var out = {}, name, any = false;
+  for (name in REG.djfilter) {
+    if (!REG.djfilter.hasOwnProperty(name)) continue;
+    var info = REG.djfilter[name]; if (!info) continue;
+    var raw = parseFloat(Resolver.byId(info.id).get('value'));
+    if (isNaN(raw)) continue;
+    var span = info.max - info.min;
+    out[name] = Math.round((span > 0 ? (raw - info.min) / span : raw) * 1000) / 1000;
+    any = true;
+  }
+  if (any) Telemetry.emit('djstate', {
+    buses: out,
+    center: (S.setmap.dj_filter_param && S.setmap.dj_filter_param.center_detent) || 0.5
+  });
 }
 
 function laneLabels(lanes) {
